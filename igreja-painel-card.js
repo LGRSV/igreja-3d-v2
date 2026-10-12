@@ -657,7 +657,7 @@ class IgrejaPainelCard extends HTMLElement {
   _cutOk() { return (this._config || {}).corte_comodo !== false; }
   _placeSel() { const v = this._p3room; if (!v) return; const f = this._frame(this._sel); if (v.o) v.o.home = f.slice(4); v.frame(...f);
     if (v.cut) v.cut(this._sel.startsWith('r:') && this._cutOk() ? this._sel.slice(2) : null); }
-  _placeAmb() { const v = this._p3amb; if (!v) return; const f = this._frame('r:' + this._asel); if (v.o) v.o.home = f.slice(4); v.frame(...f);
+  _placeAmb() { const v = this._p3amb; if (!v) return; const f = this._frame('r:' + this._asel); f[5] = Math.max(f[5], 68); if (v.o) v.o.home = f.slice(4); v.frame(...f);
     if (v.cut) v.cut(this._cutOk() ? this._asel : null); }
   _p3pins() { const v = this._p3plan; if (!v) return;
     this.$('plan-pv').querySelectorAll('.pin').forEach((p) => { if (!p._w) return; const [a, b] = v.project(p._w); p.style.left = a + 'px'; p.style.top = b + 'px'; }); }
@@ -801,7 +801,7 @@ class IgrejaPainelCard extends HTMLElement {
       <div class="rowl"><span>Brilho</span><b class="bri-t">${S.palcoBri}%</b></div><input class="rng" data-bri="palco" type="range" min="5" max="100" value="${S.palcoBri}" aria-label="Brilho do palco">`;
     const pl = $('c-plateia'); if (!keep(pl)) pl.innerHTML = `<div class="top2"><div><b>Plateia</b><span>${esc(this._dev('plateia').st)}</span></div><button type="button" class="tg ${S.on.plateia ? 'on' : ''}" data-t="plateia" aria-label="Ligar ou desligar a plateia"></button></div>
       <div class="big">${S.on.plateia ? S.plateiaBri : 0}<small>%</small></div><div class="rowl"><span>Brilho</span><b class="bri-t">${S.plateiaBri}%</b></div><input class="rng" data-bri="plateia" type="range" min="5" max="100" value="${S.plateiaBri}" aria-label="Brilho da plateia">`;
-    const tv = $('c-telao'), T = S.telao, play = T.state === 'playing'; if (!keep(tv)) tv.innerHTML = `<div class="top2"><div><b>Telão</b><span>${esc(this._dev('telao').st)}</span></div><button type="button" class="tg ${S.on.telao ? 'on' : ''}" data-t="telao" aria-label="Ligar ou desligar o telão"></button></div>
+    const tv = $('c-telao'), T = S.telao, play = T.state === 'playing'; if (!keep(tv)) tv.innerHTML = `<div class="top2"><div><b>Telão</b><span>${S.na.telao ? 'Indisponível' : !S.on.telao ? 'Desligado' : ({ playing: 'Tocando', paused: 'Pausado' })[T.state] || 'Ligado'}</span></div><button type="button" class="tg ${S.on.telao ? 'on' : ''}" data-t="telao" aria-label="Ligar ou desligar o telão"></button></div>
       <div class="sub2">${esc(S.on.telao ? [T.title, T.artist].filter(Boolean).join(' · ') || 'Sem título' : 'Telão LED desligado')}</div>
       <div class="ctl"><button type="button" data-mp="media_previous_track" aria-label="Anterior" ${S.on.telao ? '' : 'disabled'}>${svg('prev')}</button><button type="button" class="pp" data-mp="media_play_pause" aria-label="Tocar ou pausar" ${S.on.telao ? '' : 'disabled'}>${svg(play ? 'pause' : 'play')}</button><button type="button" data-mp="media_next_track" aria-label="Próxima" ${S.on.telao ? '' : 'disabled'}>${svg('next')}</button></div>`;
     $('c-som').innerHTML = `<div class="top2"><div><b>Som</b><span>Mesa e caixas do templo</span></div><button type="button" class="tg ${S.on.som ? 'on' : ''}" data-t="som" aria-label="Ligar ou desligar o som"></button></div>

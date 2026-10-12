@@ -91,6 +91,9 @@ def run(mode):
                 ok(E(f"{R}.getElementById('amb-name').textContent") == 'Voluntariado', f'[{mode}] Ambientes seleciona Voluntariado')
                 ok(E(f"{R}.querySelector('#alist [data-t=ac_voluntariado]').classList.contains('na')"), f'[{mode}] ar indisponível aparece apagado')
             if nav == 'templo':
+                E("window.__setState('media_player.telao_led','playing',{media_title:'Louvor — Base Music'})"); pg.wait_for_timeout(200)
+                t = E(f"{R}.getElementById('c-telao').textContent")
+                ok(t.count('Louvor — Base Music') == 1 and 'Tocando' in t, f'[{mode}] telão mostra o título uma vez')
                 E("window.__calls.length=0"); pg.locator('igreja-painel-card').locator('#c-plateia input[data-bri]').fill('40')
                 ok(E("window.__calls.some(c=>c[2].entity_id==='light.templo_plateia'&&c[2].brightness_pct===40)"), f'[{mode}] brilho da plateia 40%')
             if nav == 'ares':

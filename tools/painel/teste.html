@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Teste igreja-painel-card</title>
+<style>html,body{margin:0;background:#000;height:100%}#host{width:100vw;height:100vh}</style></head>
+<body><div id="host"></div>
+<script type="module">
+// hass simulado: os serviços mudam o estado e o cartão recebe um hass novo (nada real é chamado)
+const ST = {
+  'light.palco_rgb': ['off', { rgb_color: [255, 180, 110], brightness: 230 }], 'light.templo_plateia': ['on', { brightness: 153 }],
+  'media_player.telao_led': ['off', {}], 'switch.som_templo': ['off', {}],
+  'climate.ar_templo': ['off', { temperature: 22, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'binary_sensor.presenca_templo': ['on', {}], 'sensor.temperatura_templo': ['26.4', {}], 'light.hall_entrada': ['on', {}], 'light.fachada_letreiro': ['off', {}],
+  'light.estacionamento': ['off', {}], 'binary_sensor.porta_principal': ['off', {}], 'light.banheiros': ['off', {}], 'light.sala_pastoral': ['off', {}],
+  'climate.ar_sala_pastoral': ['cool', { temperature: 23, current_temperature: 25 }], 'light.recepcao': ['off', {}], 'light.administrativo': ['off', {}],
+  'light.circulacao': ['off', {}], 'light.sala_midia': ['on', {}], 'climate.ar_midia': ['off', { temperature: 21 }], 'light.voluntariado': ['off', {}],
+  'climate.ar_voluntariado': ['unavailable', {}], 'light.cozinha': ['off', {}], 'sun.sun': ['below_horizon', {}],
+  'weather.casa': ['sunny', { temperature: 31 }], 'binary_sensor.echo_conectividade': ['on', {}], 'switch.echo_nao_incomodar': ['off', {}],
+  'sensor.echo_proximo_alarme': ['2026-10-13T06:30:00-03:00', {}],
+};
+const states = {}; for (const [k, [s, a]] of Object.entries(ST)) states[k] = { entity_id: k, state: s, attributes: a };
+window.__calls = []; window.__ws = [];
+let card;
+const mk = () => ({ states: { ...states }, user: { name: 'Sandro' }, config: { time_zone: 'America/Araguaina' }, connected: true,
+  callService: (d, s, x) => { window.__calls.push([d, s, x]); setTimeout(() => apply(d, s, x), 300); return Promise.resolve(); },
+  callWS: (m) => { window.__ws.push(m); if (m.type === 'config/entity_registry/list_for_display') return Promise.resolve({ entities: [
+    { ei: 'binary_sensor.echo_conectividade', di: 'dev1' }, { ei: 'switch.echo_nao_incomodar', di: 'dev1' }, { ei: 'sensor.echo_proximo_alarme', di: 'dev1' },
+    { ei: 'notify.echo_fala', di: 'dev1' }, { ei: 'notify.echo_anuncio', di: 'dev1' }] }); return Promise.resolve({}); } });
+function apply(d, s, x) {
+  const ids = [].concat(x && x.entity_id || []);
+  for (const id of ids) { const e = states[id]; if (!e) continue; const a = { ...e.attributes };
+    let st = e.state;
+    if (s === 'turn_on') st = d === 'climate' ? 'cool' : d === 'media_player' ? 'playing' : 'on';
+    if (s === 'turn_off') st = 'off';
+    if (s === 'set_hvac_mode') st = x.hvac_mode;
+    if (s === 'set_temperature') a.temperature = x.temperature;
+    if (x.rgb_color) a.rgb_color = x.rgb_color; if (x.brightness_pct) a.brightness = Math.round(x.brightness_pct * 2.55);
+    states[id] = { ...e, state: st, attributes: a }; }
+  card.hass = mk();
+}
+window.__card = card; window.__apply = apply;
+const p = new URLSearchParams(location.search);
+await import(p.get('card') || './igreja-painel-card.js');
+card = document.createElement('igreja-painel-card'); window.__card = card;
+card.setConfig(JSON.parse(p.get('cfg') || '{"alexa_device":"dev1"}'));
+document.getElementById('host').appendChild(card);
+card.hass = mk();
+window.__ready = true;
+</script></body></html>

@@ -10427,13 +10427,32 @@ export class IgrejaPainel3D {
     }
   }
   _precompile() {
-    const r = this.renderer, cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 600); cam.position.set(60, 60, 30); cam.lookAt(10, 0, 30);
+    const r = this.renderer, cam = new THREE.PerspectiveCamera(50, 1.6, 0.1, 600); cam.position.set(60, 60, 30); cam.lookAt(10, 0, 30); cam.updateMatrixWorld();
     for (const s of this.segs) for (const c of s.caps) c.visible = true;
     let p;
     try { p = r.extensions.has('KHR_parallel_shader_compile') ? r.compileAsync(this.scene, cam) : (r.compile(this.scene, cam), Promise.resolve()); } catch (e) { p = Promise.resolve(); }
     for (const s of this.segs) for (const c of s.caps) c.visible = false;
-    return p.catch(() => {});
+    return p.catch(() => {}).then(() => this._warm(cam));
   }
+  // Aquece os programas de todas as combinações que as vistas usam (paredes cortadas × recorte do cômodo), desenhando 1×1 px:
+  // sem isso o primeiro corte/cômodo de cada vista compilava dezenas de shaders na hora (picos de 0,2–0,6 s)
+  _warm(cam) {
+    const r = this.renderer, big = 1e4, keep = [new THREE.Plane(new THREE.Vector3(1, 0, 0), big), new THREE.Plane(new THREE.Vector3(-1, 0, 0), big),
+      new THREE.Plane(new THREE.Vector3(0, 0, 1), big), new THREE.Plane(new THREE.Vector3(0, 0, -1), big)];
+    const hidden = []; this.scene.traverse((o) => { if (!o.visible && (o.isMesh || o.isSprite || o.isPoints)) { o.visible = true; hidden.push(o); } });
+    const t0 = performance.now();
+    try {
+      r.setScissorTest(true);
+      for (const cut of [false, true]) for (const clip of [false, true]) {
+        for (const s of this.segs) this._setCut(s, cut);
+        r.clippingPlanes = clip ? keep : [];
+        r.setViewport(0, 0, 1, 1); r.setScissor(0, 0, 1, 1); r.render(this.scene, cam);
+      }
+    } catch (e) { console.warn('igreja-painel-3d: aquecimento', e); }
+    r.clippingPlanes = []; for (const s of this.segs) this._setCut(s, false); for (const o of hidden) o.visible = false;
+    r.shadowMap.needsUpdate = true; this._key = null; this._warmMs = Math.round(performance.now() - t0);
+  }
+
 
   // Corta (por vista) os trechos de parede entre a câmera e o retângulo em foco: raio câmera → ponto do foco (altura ty) atravessa o trecho
   // (extensão e altura reais)? Divisórias dentro do foco são sempre cortadas, exceto na visão geral.

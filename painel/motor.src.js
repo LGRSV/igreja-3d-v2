@@ -415,8 +415,12 @@ export class IgrejaPainel3D {
   // Corta (por vista) os trechos de parede entre a câmera e o retângulo em foco: raio câmera → ponto do foco (altura ty) atravessa o trecho
   // (extensão e altura reais)? Divisórias dentro do foco são sempre cortadas, exceto na visão geral.
   _applyCuts(v) {
-    const C = v.cam.position, [x0, z0, x1, z1] = v.rect, ins = P3_TUNE.ins, ty = P3_TUNE.ty;
-    const lotA = (LOT.x1 - LOT.x0) * (LOT.z1 - LOT.z0), overview = (x1 - x0) * (z1 - z0) > P3_TUNE.overview * lotA;
+    const C = v.cam.position, ins = P3_TUNE.ins, ty = P3_TUNE.ty;
+    // com zoom só conta o que está na tela: o retângulo encolhe em volta do alvo (1/zoom); assim aproximar não derruba paredes
+    // que nem aparecem (antes os pontos de amostra cobriam o retângulo inteiro e a câmera mais perto cortava mais trechos)
+    const zr = Math.max(1, v.zoom || 1), tx = v.target.x, tz = v.target.z;
+    const [x0, z0, x1, z1] = zr > 1 ? [tx + (v.rect[0] - tx) / zr, tz + (v.rect[1] - tz) / zr, tx + (v.rect[2] - tx) / zr, tz + (v.rect[3] - tz) / zr] : v.rect;
+    const lotA = (LOT.x1 - LOT.x0) * (LOT.z1 - LOT.z0), overview = (v.rect[2] - v.rect[0]) * (v.rect[3] - v.rect[1]) > P3_TUNE.overview * lotA;
     const nx = Math.max(3, Math.min(P3_TUNE.maxN, Math.ceil((x1 - x0) / P3_TUNE.grid) + 1)), nz = Math.max(3, Math.min(P3_TUNE.maxN, Math.ceil((z1 - z0) / P3_TUNE.grid) + 1));
     let sig = '';
     for (const W of this.segs) {

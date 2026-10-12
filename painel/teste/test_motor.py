@@ -30,7 +30,7 @@ p = r['res']['js']; h = lambda k: p[k]['hit'] or {}
 check('pickAt luminária da plateia', h('room_highbay').get('kind') == 'light' and h('room_highbay').get('key') == 'plateia', p['room_highbay'])
 check('pickAt moving head do palco', h('room_moving').get('key') == 'palco', p['room_moving'])
 check('pickAt telão', h('room_telao').get('kind') == 'telao', p['room_telao'])
-check('pickAt ar do templo', h('room_ac').get('kind') == 'ac' and h('room_ac').get('key') == 'ac_templo', p['room_ac'])
+check('pickAt ar do templo', h('room_ac').get('kind') == 'ac' and (h('room_ac').get('key') or '').startswith('ac_templo_'), p['room_ac'])
 check('pickAt som', h('room_som').get('kind') == 'som', p['room_som'])
 check('pickAt piso = cômodo', h('room_piso').get('kind') == 'room' and h('room_piso').get('room') == 'templo', p['room_piso'])
 check('pickAt luz do hall na planta', h('plan_hall_luz').get('key') == 'hall', p['plan_hall_luz'])

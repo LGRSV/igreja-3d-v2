@@ -34,6 +34,14 @@ const P3_KIND = { light: 'light', climate: 'ac', media: 'telao', switch: 'som' }
 // v1.1: splits do templo controláveis um a um — 'ac_templo_1' … 'ac_templo_5', numerados da esquerda para a direita de quem está no palco
 // olhando a plateia (+x): a esquerda é z menor. Cada chave individual no estado manda na sua unidade; sem ela vale 'ac_templo'.
 const P3_UNITS = { ac_templo: 5 };
+// fan_mode do HA → fator do fluxo (velocidade e força); números por proporção (1…5 ou 0…100 %); sem fan = 1
+const P3_FAN = { quiet: 0.5, silent: 0.5, low: 0.6, middle: 1, medium: 1, mid: 1, auto: 1, high: 1.5, strong: 1.5, turbo: 1.8, max: 1.8, highest: 1.8, lowest: 0.5 };
+function p3Fan(f) {
+  if (f == null || f === '') return 1;
+  const k = String(f).toLowerCase().trim(); if (P3_FAN[k] != null) return P3_FAN[k];
+  const v = parseFloat(k); if (isNaN(v)) return 1;
+  return v <= 5 ? Math.max(0.5, Math.min(1.8, 0.5 + 1.3 * (v - 1) / 4)) : Math.max(0.5, Math.min(1.8, 0.5 + 1.3 * Math.min(v, 100) / 100));
+}
 const p3Unit = (k) => { const m = /^(ac_[a-z]+)_(\d)$/.exec(k || ''); return m && P3_UNITS[m[1]] && +m[2] >= 1 && +m[2] <= P3_UNITS[m[1]] ? { base: m[1], n: +m[2] } : null; };
 
 class P3View {
@@ -123,7 +131,7 @@ class P3View {
   cut(id) {
     const r = id ? (ROOMS3D[id] || BLOCKS3D[id]) : null;
     this._cutRoom = r ? id : null;
-    if (!r) this._clip = null;
+    if (!r) { this._clip = null; this._clipBox = null; }
     else {
       const m = 0.22, [x0, z0, x1, z1] = r;
       this._clip = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -(x0 - m)), new THREE.Plane(new THREE.Vector3(-1, 0, 0), x1 + m),
@@ -615,23 +623,34 @@ export class IgrejaPainel3D {
     if (H0._needShadow) { this.renderer.shadowMap.needsUpdate = true; H0._needShadow = false; }
   }
 
-  // ligado/modo de cada unidade do ar: chave individual (ac_templo_N) manda na unidade; senão vale a da entidade
+  // ligado/modo/velocidade/oscilação de cada unidade do ar: chave individual (ac_templo_N) manda na unidade; senão vale a da entidade
   _acWants(st, key) {
     const ac = st.ac || {}, rt = this.host._items.get(key), n = rt && rt.airUnits ? rt.airUnits.length : 1, all = ac[key] || {};
-    const out = Array.from({ length: n }, () => ({ on: !!all.on, mode: all.mode }));
-    if (P3_UNITS[key]) for (let k = 1; k <= P3_UNITS[key]; k++) { const u = ac[key + '_' + k], i = this._unitIdx(key, k); if (u && i != null) out[i] = { on: !!u.on, mode: u.mode || all.mode }; }
+    const pick = (u, d) => ({ on: !!u.on, mode: u.mode || d.mode, fan: u.fan != null ? u.fan : d.fan, swing: u.swing != null ? u.swing : d.swing });
+    const out = Array.from({ length: n }, () => pick(all, {}));
+    if (P3_UNITS[key]) for (let k = 1; k <= P3_UNITS[key]; k++) { const u = ac[key + '_' + k], i = this._unitIdx(key, k); if (u && i != null) out[i] = pick(u, all); }
     return out;
   }
   // Ar → unidades. Na 1ª vez (carga) fica como está, sem animar. Depois, unidade que liga entra na sua vez (como o _airStart do
   // cartão: 0,6 s + 2,5 s por unidade no templo; 0,4 s com uma só) e a que desliga fecha — tudo pelo _airStep do cartão, via rt.seq.
+  // M3: fan (fan_mode do HA) deixa o fluxo mais forte e rápido (troca suave, sem reiniciar o ligar); swing ≠ off faz a aleta oscilar.
   _acApply(st, key, rt, nl, now) {
-    const H0 = this.host, w = this._acWants(st, key).map((u) => u.on), hv = rt.hvacOn || rt.hvac;
+    const H0 = this.host, W = this._acWants(st, key), w = W.map((u) => u.on), hv = rt.hvacOn || rt.hvac;
     const col = hv === 'cool' ? 0x67d3ff : hv === 'heat' ? 0xff8a5b : 0x8ef0b0;
     this._acPrev = this._acPrev || new Map(); this._airCol = this._airCol || new Map(); this._airCol.set(key, col); this._nl = nl;
     const prev = this._acPrev.get(key); this._acPrev.set(key, w);
     rt.on = w.some(Boolean);
-    if (!prev) { rt.seq = { t0: now, off: w.map((on) => (on ? -1e9 : Infinity)) }; rt.snap = true; H0._airStep(rt, col, now, 0, nl, key); return; }
-    if (prev.length === w.length && prev.every((x, i) => x === w[i])) { H0._airStep(rt, col, now, 0, nl, key); return; }
+    const first = W.find((u) => u.on) || W[0] || {}, sp = p3Fan(first.fan);
+    const spChanged = rt.p3sp != null && Math.abs(sp - rt.p3sp) > 1e-3;
+    rt.p3sp = sp; if (rt.p3spc == null || !prev) rt.p3spc = sp;   // alvo e valor atual (anda até o alvo no _airLoop)
+    rt.p3swing = W.map((u) => !!u.on && u.swing != null && u.swing !== 'off' && u.swing !== false);
+    if (!prev) { rt.seq = { t0: now, off: w.map((on) => (on ? -1e9 : Infinity)) }; rt.snap = true; H0._airStep(rt, col, now, 0, nl, key); this._airPost(rt, now); this._swingCheck(); return; }
+    const same = prev.length === w.length && prev.every((x, i) => x === w[i]);
+    if (same) {
+      H0._airStep(rt, col, now, 0, nl, key); this._airPost(rt, now);
+      if (spChanged && rt.on) { rt.airUntil = Math.max(rt.airUntil || 0, now + 8000); (this._airAnim = this._airAnim || new Set()).add(key); this._airLoop(); }   // o ar anda um pouco para mostrar a nova velocidade
+      this._swingCheck(); return;
+    }
     const lead = H0._reduced ? 0 : 600, stag = H0._reduced ? 0 : 2500;
     const fresh = (rt.airOrder || w.map((_, i) => i)).filter((i) => w[i] && !prev[i]), many = fresh.length > 1;
     const off = w.map((on, i) => (!on ? Infinity : fresh.includes(i) ? (many ? lead + fresh.indexOf(i) * stag : (H0._reduced ? 0 : 400)) : -1e9));
@@ -639,25 +658,64 @@ export class IgrejaPainel3D {
     const end = Math.max(0, ...off.filter((x) => x > -1e8 && x < Infinity));
     rt.airUntil = Math.max(rt.airUntil || 0, now + end + 2600 + 8000);
     (this._airAnim = this._airAnim || new Set()).add(key);
-    this._airLoop();
+    this._airLoop(); this._swingCheck();
   }
-  // relógio da animação dos ares (~25 q/s): avança o _airStep do cartão, faz o ar andar e redesenha as vistas até assentar
-  _airLoop() {
-    if (this._airRaf || !this._airAnim || !this._airAnim.size) return;
-    const H0 = this.host;
+  // depois do _airStep: intensidade pela velocidade e aleta oscilando (unidade ligada, aleta já aberta, sem reduced motion)
+  _airPost(rt, now) {
+    const k = rt.p3spc == null ? 1 : rt.p3spc, gain = 0.6 + 0.4 * k;
+    if (rt.airMesh) rt.airMesh.material.uniforms.uI.value *= gain;
+    if (rt.airPts) rt.airPts.material.uniforms.uI.value *= gain;
+    if (!rt.p3swing || !rt.airUnits) return;
+    const red = this.host._reduced;
+    rt.airUnits.forEach((u, i) => {
+      const fl = rt.flaps && rt.flaps[i]; if (!fl || u.f < 1 || !u.on) return;
+      fl.rotation.x = rt.p3swing[i] && !red ? 0.9 + 0.3 * Math.sin(now * 0.00125 + i * 1.7) : 0.9;   // oscilando: ~5 s por vaivém (~35°–69°) · off: parada aberta
+    });
+  }
+  // há unidade oscilando que aparece em alguma vista? (frustum + recorte do cômodo + canvas na página + aba visível)
+  _swingVisible() {
+    if (this.host._reduced || (typeof document !== 'undefined' && document.hidden)) return false;
+    const vv = new THREE.Vector3();
+    for (const key of AC_KEYS) {
+      const rt = this.host._items.get(key); if (!rt || !rt.p3swing || !rt.p3swing.some(Boolean)) continue;
+      for (const v of this.views) {
+        if (!v.c.isConnected || !v._wh) continue; const cb = v._clipBox;
+        for (let i = 0; i < rt.airUnits.length; i++) {
+          if (!rt.p3swing[i]) continue; const p = rt.airUnits[i].p;
+          if (cb && (p.x < cb[0] || p.x > cb[2] || p.z < cb[1] || p.z > cb[3])) continue;
+          vv.copy(p).project(v.cam); if (vv.z < 1 && Math.abs(vv.x) <= 1.05 && Math.abs(vv.y) <= 1.05) return true;
+        }
+      }
+    }
+    return false;
+  }
+  _swingCheck() { if (!this._airRaf && this._swingVisible()) this._airLoop(true); }
+  // relógio dos ares (≤ 20 q/s): avança o _airStep do cartão (ligar/desligar), o fluxo andando na velocidade do fan e a aleta
+  // oscilando; redesenha as vistas e para sozinho quando nada mais anda (a oscilação só conta se aparece em alguma vista)
+  _airLoop(force) {
+    if (this._airRaf || (!force && (!this._airAnim || !this._airAnim.size))) return;
+    const H0 = this.host; this._airAnim = this._airAnim || new Set();
     const step = () => {
       const now = performance.now();
-      if (now - (this._airLast || 0) >= 40) {
+      let more = this._airAnim.size > 0;
+      if (now - (this._airLast || 0) >= 50) {
         const dt = Math.min((now - (this._airLast || now)) / 1000, 0.1); this._airLast = now;
-        for (const key of [...this._airAnim]) {
-          const rt = H0._items.get(key); if (!rt) { this._airAnim.delete(key); continue; }
+        const swingOn = this._swingVisible();
+        for (const key of AC_KEYS) {
+          const rt = H0._items.get(key); if (!rt || !rt.airUnits) continue;
+          const anim = this._airAnim.has(key), sw = swingOn && rt.p3swing && rt.p3swing.some(Boolean);
+          if (!anim && !sw) continue;
+          if (rt.p3sp != null) rt.p3spc += (rt.p3sp - rt.p3spc) * (1 - Math.exp(-dt * 2.5));   // troca de velocidade suave
           const busy = H0._airStep(rt, this._airCol.get(key), now, dt, this._nl == null ? 1 : this._nl, key);
-          const t = (now / 1000) % 1000; if (rt.airMesh) rt.airMesh.material.uniforms.uT.value = t; if (rt.airPts) rt.airPts.material.uniforms.uT.value = t;
-          if (!busy && now > (rt.airUntil || 0)) this._airAnim.delete(key);
+          this._airPost(rt, now);
+          rt.p3t = ((rt.p3t || 0) + dt * (rt.p3spc || 1)) % 1000;   // relógio do fluxo na velocidade do fan
+          if (rt.airMesh) rt.airMesh.material.uniforms.uT.value = rt.p3t; if (rt.airPts) rt.airPts.material.uniforms.uT.value = rt.p3t;
+          if (anim && !busy && now > (rt.airUntil || 0) && Math.abs((rt.p3sp || 1) - (rt.p3spc || 1)) < 0.01) this._airAnim.delete(key);
         }
+        more = this._airAnim.size > 0 || swingOn;
         this.views.forEach((v) => v.render());
       }
-      if (this._airAnim.size) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
+      if (more) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
     };
     this._airRaf = requestAnimationFrame(step);
   }
@@ -702,5 +760,6 @@ export class IgrejaPainel3D {
     v.g2.clearRect(0, 0, pw, ph);
     v.g2.drawImage(cv, 0, cv.height - ph, pw, ph, 0, 0, pw, ph);
     v.drawn = (v.drawn || 0) + 1;
+    if (!this._airRaf && this._acPrev) this._swingCheck();
   }
 }

@@ -21,6 +21,24 @@ JS = r"""(async () => {
   await sleep(1300); out.todos_1300ms = snap();
   await sleep(11500); out.todos_13s = snap(); out.anim_fim = E._airAnim.size;
   await sleep(9000); out.anim_depois = E._airAnim.size;
+  // M3 — velocidade: fan low × high (força = uI, rapidez = quanto o relógio do fluxo anda em 1 s)
+  const fl = rt.airMesh.material.uniforms, rate = async () => { const a = fl.uT.value; await sleep(1000); return +(fl.uT.value - a).toFixed(3); };
+  window.S.ac = { ac_templo: { on: true, mode: 'heat', fan: 'low' } }; go(); await sleep(2500);
+  out.low = { uI: +fl.uI.value.toFixed(3), rate: await rate(), sem_reiniciar: snap().every((u) => u[1] > 0.95) };
+  window.S.ac = { ac_templo: { on: true, mode: 'heat', fan: 'high' } }; go(); await sleep(2500);
+  out.high = { uI: +fl.uI.value.toFixed(3), rate: await rate(), sem_reiniciar: snap().every((u) => u[1] > 0.95) };
+  // M3 — aleta: swing no split 2 (oscila), os outros parados; off → para aberta
+  const i2 = idx(2), ang = () => rt.flaps.map((f) => +f.rotation.x.toFixed(3));
+  window.S.ac = { ac_templo: { on: true, mode: 'heat' }, ac_templo_2: { on: true, mode: 'heat', swing: 'vertical' } }; go(); await sleep(400);
+  const a1 = ang(); await sleep(1300); const a2 = ang();
+  out.swing = { a1, a2, i2, raf: !!E._airRaf };
+  window.S.ac = { ac_templo: { on: true, mode: 'heat' }, ac_templo_2: { on: true, mode: 'heat', swing: 'off' } }; go(); await sleep(600);
+  const b1 = ang(); await sleep(1300); out.swing_off = { b1, b2: ang() };
+  // oscilando mas fora de todas as vistas: o relógio para
+  window.S.ac = { ac_templo: { on: true, mode: 'heat', swing: 'on' } }; go(); await sleep(300);
+  for (const v of [V.plan, V.room, V.cut, V.mini]) { v.frame(...MOD.ROOMS3D.midia); v.cut('midia'); }
+  await sleep(10500); out.fora = { raf: !!E._airRaf, anim: E._airAnim.size };
+  V.room.frame(...MOD.ROOMS3D.templo); V.room.cut(null); await sleep(400); out.volta = !!E._airRaf;
   return out;
 })()"""
 r = run('http://painel.test/painel/teste/motor.html', sys.argv[1] if len(sys.argv) > 1 else 'ar.png', JS, 800)
@@ -44,4 +62,15 @@ ck('pickAt em cada split → ac_templo_N', x['pick'] == ['ac_templo_%d' % n for 
 ck('todos: escalonados (1,3 s: 1 ou 2 com LED)', 1 <= sum(1 for u in x['todos_1300ms'] if u[0] > 0.5) <= 2, x['todos_1300ms'])
 ck('todos: abertos depois de 13 s', all(on(u) for u in x['todos_13s']), x['todos_13s'])
 ck('animação para sozinha depois', x['anim_depois'] == 0, x['anim_depois'])
+lo, hi = x['low'], x['high']
+ck('fan high: fluxo mais forte que low', hi['uI'] > lo['uI'] * 1.2, [lo, hi])
+ck('fan high: fluxo mais rápido que low', hi['rate'] > lo['rate'] * 1.8, [lo, hi])
+ck('trocar o fan não reinicia o ligar (aletas abertas)', lo['sem_reiniciar'] and hi['sem_reiniciar'], [lo, hi])
+sw = x['swing']; j = sw['i2']
+ck('swing on: a aleta do split 2 muda de ângulo', abs(sw['a1'][j] - sw['a2'][j]) > 0.05, sw)
+ck('swing on: as outras aletas paradas', all(abs(sw['a1'][k] - sw['a2'][k]) < 1e-3 for k in range(5) if k != j), sw)
+so = x['swing_off']
+ck('swing off: aleta parada aberta na posição normal', all(abs(a - b) < 1e-3 and abs(a - 0.9) < 0.02 for a, b in zip(so['b1'], so['b2'])), so)
+ck('oscilação fora de todas as vistas: relógio parado', not x['fora']['raf'], x['fora'])
+ck('volta a oscilar quando aparece numa vista', x['volta'], x['volta'])
 print('\n' + ('TUDO OK' if not fails else f'{len(fails)} FALHA(S)')); sys.exit(1 if fails else 0)

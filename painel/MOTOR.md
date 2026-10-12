@@ -47,3 +47,12 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - O fluxo de ar é um shader por entidade: a cor segue o modo da primeira unidade ligada (modos diferentes por unidade
   mudam o LED só pela entidade).
 - Teste: `painel/teste/test_ar.py` (carga sem animação, um split sozinho anima e os outros não, desligar fecha, todos escalonados, pickAt por unidade).
+
+## Velocidade e oscilação (M3)
+- `estado.ac[chave] = { on, mode, fan, swing }` (também em `ac_templo_N`). Sem `fan`/`swing`, nada muda.
+- `fan` (fan_mode do HA) → fator do fluxo: quiet 0,5 · low 0,6 · medium/auto 1,0 · high 1,5 · turbo 1,8; números por proporção
+  (1…5, ou 0…100 %). O fluxo fica mais forte (intensidade 0,6 + 0,4 × fator) e mais rápido (relógio × fator); a troca é suave
+  (~0,4 s), não reinicia o ligar, e o ar anda ~8 s para mostrar a velocidade nova. A velocidade é por entidade (a da 1ª unidade ligada).
+- `swing` ≠ off (on/vertical/horizontal/both) com a unidade ligada → a aleta oscila devagar (~5 s por vaivém, ~35°–69°), por unidade.
+  Com off, ela fica aberta na posição normal (0,9 rad). O relógio roda a ≤ 20 q/s e só enquanto uma unidade oscilando aparece
+  em alguma vista (frustum, corte no cômodo, canvas na página, aba visível); com prefers-reduced-motion fica parada.

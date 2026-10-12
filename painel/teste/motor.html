@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Teste do motor 3D do painel</title>
+<style>
+  body { margin: 0; background: #0b1220; color: #dfe6f0; font: 13px system-ui, sans-serif; }
+  .v { position: absolute; overflow: hidden; background: #0a0f1e; border: 1px solid #22304a; }
+  .v canvas { width: 100%; height: 100%; display: block; }
+  #plan { left: 8px; top: 8px; width: 760px; height: 470px; }
+  #room { left: 776px; top: 8px; width: 600px; height: 470px; }
+  #cut  { left: 8px; top: 486px; width: 560px; height: 380px; }
+  #mini { left: 576px; top: 486px; width: 260px; height: 170px; }
+  #log  { position: absolute; left: 846px; top: 486px; right: 8px; white-space: pre-wrap; }
+</style></head><body>
+<div class="v" id="plan"><canvas></canvas></div>
+<div class="v" id="room"><canvas></canvas></div>
+<div class="v" id="cut"><canvas></canvas></div>
+<div class="v" id="mini"><canvas></canvas></div>
+<div id="log"></div>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const mod = await import('../../igreja-painel-3d.js?v=' + Date.now());
+window.MOD = mod;
+const E = mod.IgrejaPainel3D.shared({ night_vision: true, quality: q.get('q') || 'alta' });
+const S = { lights: { hall: true, fachada: true, estacionamento: true, midia: true, voluntariado: true, cozinha: false },
+  palco: { on: true, rgb: [140, 80, 255], bri: 90 }, plateia: { on: true, bri: 70 }, telao: { on: true, title: 'Culto de domingo' },
+  som: true, ac: { ac_templo: { on: true, mode: 'cool' }, ac_midia: { on: false } }, porta: false, night: q.get('dia') ? false : true };
+window.S = S;
+const t0 = performance.now();
+await E.ready();
+window.T_READY = performance.now() - t0;
+const cv = (id) => document.querySelector('#' + id + ' canvas');
+const plan = E.view(cv('plan'), { interactive: true, home: mod.PLAN3D.slice(4), state: () => window.S });
+plan.frame(...mod.PLAN3D);
+const r = mod.ROOMS3D.templo;
+const room = E.view(cv('room'), { interactive: true, state: () => window.S });
+room.frame(...r);
+const cut = E.view(cv('cut'), { interactive: true, state: () => window.S });
+cut.frame(...mod.ROOMS3D[q.get('room') || 'midia']); cut.cut(q.get('room') || 'midia');
+const mini = E.view(cv('mini'), { res: 1, state: () => window.S });
+mini.frame(...mod.BLOCKS3D.templo);
+window.V = { plan, room, cut, mini, E };
+window.HITS = [];
+for (const [n, v] of Object.entries({ plan, room, cut })) v.onClick((px, py, hit) => window.HITS.push([n, hit]));
+document.getElementById('log').textContent = `motor v${mod.VERSION} pronto em ${Math.round(window.T_READY)} ms`;
+window.READY = true;
+</script></body></html>

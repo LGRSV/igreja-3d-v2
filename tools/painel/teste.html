@@ -6,12 +6,12 @@
 const ST = {
   'light.palco_rgb': ['off', { rgb_color: [255, 180, 110], brightness: 230 }], 'light.templo_plateia': ['on', { brightness: 153 }],
   'media_player.telao_led': ['off', {}], 'switch.som_templo': ['off', {}],
-  'climate.ar_templo': ['off', { temperature: 22, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
-  'climate.ar_templo_1': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
-  'climate.ar_templo_2': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
-  'climate.ar_templo_3': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
-  'climate.ar_templo_4': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
-  'climate.ar_templo_5': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo': ['off', { temperature: 22, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
+  'climate.ar_templo_1': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
+  'climate.ar_templo_2': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
+  'climate.ar_templo_3': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
+  'climate.ar_templo_4': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
+  'climate.ar_templo_5': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high', 'turbo'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }],
   'binary_sensor.presenca_templo': ['on', {}], 'sensor.temperatura_templo': ['26.4', {}], 'light.hall_entrada': ['on', {}], 'light.fachada_letreiro': ['off', {}],
   'light.estacionamento': ['off', {}], 'binary_sensor.porta_principal': ['off', {}], 'light.banheiros': ['off', {}], 'light.sala_pastoral': ['off', {}],
   'climate.ar_sala_pastoral': ['cool', { temperature: 23, current_temperature: 25 }], 'light.recepcao': ['off', {}], 'light.administrativo': ['off', {}],
@@ -36,6 +36,7 @@ function apply(d, s, x) {
     if (s === 'turn_off') st = 'off';
     if (s === 'set_hvac_mode') st = x.hvac_mode;
     if (s === 'set_temperature') a.temperature = x.temperature;
+    if (s === 'set_fan_mode') a.fan_mode = x.fan_mode; if (s === 'set_swing_mode') a.swing_mode = x.swing_mode;
     if (x.rgb_color) a.rgb_color = x.rgb_color; if (x.brightness_pct) a.brightness = Math.round(x.brightness_pct * 2.55);
     states[id] = { ...e, state: st, attributes: a }; }
   card.hass = mk();

@@ -9,6 +9,54 @@ som e dos ares acendem com o estado e a porta de vidro abre quando o sensor da p
 É o mesmo motor do cartão `casa3d-card` (repositório [casa-chefe](https://github.com/LGRSV/casa-chefe)),
 refeito para a planta da igreja.
 
+## Painel dashboard (`igreja-painel-card`) — novo
+
+Painel de tela inteira para tablet ou TV, no mesmo modelo do painel da casa (aba Alexa 2 do `casa-petroleo-card`):
+desenho 1280×800 que ocupa a área toda (sem tarjas), menu lateral e vistas 3D da igreja que respondem ao toque.
+O 3D é o deste repositório: `igreja-painel-3d.js` é **gerado** do `igreja3d-card.js` (cena inteira, decoração, luzes,
+telão, ares e portas), com uma camada por cima para várias vistas ao mesmo tempo, toque nos aparelhos e corte por cômodo.
+
+- **Início**: resumo (presença, luzes acesas, ares, culto no ar), cenas (Culto, Ensaio, Chegada, Limpeza, Fechar tudo) com
+  miniaturas 3D, bloco selecionado em 3D com os aparelhos, planta interativa com pinos e os 5 blocos com «Tudo».
+- **Ambientes**: os cômodos por bloco; escolher um mostra a igreja cortada só nele, com lâmpadas e ar tocáveis.
+- **Templo / Culto**: palco RGB (cores e brilho), plateia, telão, som e ar do templo.
+- **Ares**: os 4 ares com modo e temperatura.
+- **Alexa** (só com `alexa_device`): falar/anunciar, comandos, sons e status.
+
+Demo com Home Assistant simulado: `painel.html` (abrir por HTTP, por exemplo `python3 -m http.server` e
+`http://localhost:8000/painel.html`; por `file://` o navegador bloqueia os módulos).
+
+### Instalação
+
+1. Copie `igreja-painel-card.js` **e** `igreja-painel-3d.js` para a mesma pasta, por exemplo `/config/www/igreja3d/`
+   (o cartão importa o motor da própria pasta).
+2. Recurso do Lovelace (Módulo JavaScript): `/local/igreja3d/igreja-painel-card.js?v=1.0.0`. Suba o `v` a cada troca.
+3. Uma vista do tipo **Painel** com o cartão:
+
+   ```yaml
+   title: Igreja
+   path: igreja
+   type: panel
+   cards:
+     - type: custom:igreja-painel-card
+       title: Base Church
+       entities:            # mesmas chaves do igreja3d-card (veja "Configuração completa")
+         palco: light.SEU_PALCO
+       # alexa_device: <id do Echo>   # mostra o menu Alexa
+   ```
+
+Opções: `entities`, `title`, `height`, `vista_3d: false` (sem 3D, planta 2D), `luz_3d: noite|dia`, `night_vision`,
+`quality` (como no igreja3d-card), `toque: false` (vistas só de olhar), `corte_comodo: false`, `alexa_device`
+(com `alexa_fala`, `alexa_anuncio`, `alexa_nao_incomodar` opcionais).
+
+### Desenvolvimento
+
+- `python3 build_painel.py` gera o `igreja-painel-3d.js` a partir do `igreja3d-card.js` + `painel/motor.src.js`.
+  Rode de novo sempre que o cartão 3D mudar; não edite o arquivo gerado (API em `painel/MOTOR.md`).
+- Testes (Playwright para Python com o Chrome instalado, sem Node):
+  `python tools/painel/teste_cartao.py <saída> igreja-painel-3d.js` (cartão com o motor real) e
+  `python painel/teste/test_motor.py <saída>` (motor).
+
 ## Novidades da v1.8.0 — blocos do dono, cena limpa, topo em lista suspensa e visual Apple
 
 - **Blocos**: Templo (um cômodo só, com todos os aparelhos) · Operacional (Sala Gilvan, Administrativo, Circulação, Mídia, Voluntariado) · Banheiro (Depósito ao WC Fem., numa lista só) · Sala Pastoral (os fundos, numa lista só) · Hall de entrada (Hall, WCs, Estacionamento, Fachada). A Sala da Família saiu das listas.

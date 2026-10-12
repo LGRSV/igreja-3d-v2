@@ -1,0 +1,24 @@
+<!doctype html><html lang="pt-BR"><head>
+<!-- Demo do painel dashboard da igreja com Home Assistant simulado. Abra por HTTP (GitHub Pages ou python3 -m http.server), não por file://. --><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel da Igreja · demo</title>
+<style>html,body{margin:0;height:100%;background:#111;font-family:system-ui,sans-serif}#host{position:fixed;inset:0}
+#erro{position:fixed;left:0;right:0;bottom:0;background:#5a1410;color:#fff;font:13px ui-monospace,monospace;padding:8px 12px;white-space:pre-wrap;display:none;z-index:9}
+#vazio{color:#bbb;display:grid;place-items:center;height:100%;font-size:18px}#toast{display:none}</style></head>
+<body><div id="host"><div id="vazio">Carregando o painel…</div></div><div id="erro"></div><div id="toast"></div>
+<script type="module">
+const erro = (m) => { const e = document.getElementById('erro'); e.style.display = 'block'; e.textContent += m + '\n'; (window.__erros ||= []).push(m); };
+window.addEventListener('error', (e) => erro(String(e.message)));
+window.addEventListener('unhandledrejection', (e) => erro('Promise: ' + (e.reason && e.reason.message || e.reason)));
+const v = new URLSearchParams(location.search).get('v') || Date.now();
+try {
+  await import('./igreja-painel-card.js?v=' + v);
+  const tag = customElements.get('igreja-painel-card') ? 'igreja-painel-card' : null;
+  if (!tag) throw new Error('nenhum elemento igreja-painel-card registrado');
+  const el = document.createElement(tag); el.style.cssText = 'display:block;height:100%';
+  const host = document.getElementById('host'); host.replaceChildren(el);
+  const { attach } = await import('./painel/demo-hass.js?v=' + v);
+  attach(el, { type: 'custom:' + tag, title: 'Base Church', height: '100vh' });
+  window.__card = el; window.__tag = tag;
+} catch (e) { erro('Falha ao carregar o cartão: ' + (e && e.message || e)); }
+window.__pronto = true;
+</script></body></html>

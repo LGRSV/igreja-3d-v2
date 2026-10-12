@@ -6,7 +6,7 @@
  * sem o motor fica uma planta 2D desenhada aqui mesmo (mesma API de vista).
  * Entidades e blocos = os do igreja3d-card v1.8 (templo · operacional · banheiro · pastoral · hall).
  */
-const IGP_VERSION = '1.1.0'; // v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
+const IGP_VERSION = '1.2.0'; // v1.2.0: em cada A/C o botão ⏻, Velocidade (fan_modes) e Aleta (swing_modes) com seletor; modo do split também no seletor · v1.1.0: v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
 const P3_URL = new URL('igreja-painel-3d.js?v=1.0.1', import.meta.url).href;
 
 // ---------- entidades (iguais ao README do igreja3d-card, "Configuração completa") ----------
@@ -83,6 +83,10 @@ const SCENE_ON = {   // o que cada cena deixa ligado (para as miniaturas)
 };
 const PRESETS = [['Quente', '#ffb46e', [255, 180, 110], 2700], ['Branco', '#fff4e5', null, 5000], ['Azul', '#286eff', [40, 110, 255]], ['Roxo', '#8c3ce6', [140, 60, 230]],
   ['Vermelho', '#ff2828', [255, 40, 40]], ['Verde', '#28c85a', [40, 200, 90]]];
+const FAN_PT = { auto: 'Auto', low: 'Baixa', medium: 'Média', middle: 'Média', mid: 'Média', high: 'Alta', quiet: 'Silencioso', silent: 'Silencioso', turbo: 'Turbo', strong: 'Forte', diffuse: 'Difuso', focus: 'Foco', on: 'Ligado', off: 'Desligado' };
+const SWING_PT = { off: 'Parada', on: 'Oscilando', vertical: 'Vertical', horizontal: 'Horizontal', both: 'Ambas' };
+const FAN_DEF = ['auto', 'low', 'medium', 'high'], SWING_DEF = ['off', 'on'];
+const ptOf = (T, v) => v == null || v === '' ? '—' : T[String(v).toLowerCase()] || (/^\d+$/.test(String(v)) ? String(v) : String(v).charAt(0).toUpperCase() + String(v).slice(1).replace(/_/g, ' '));
 const MODES = [['Frio', 'snow', 'cool'], ['Auto', 'auto', 'heat_cool'], ['Seco', 'drop', 'dry'], ['Ventilar', 'fan', 'fan_only']];
 const HVAC_PT = { cool: 'Frio', heat_cool: 'Auto', auto: 'Auto', dry: 'Seco', fan_only: 'Ventilar', heat: 'Quente' };
 const ALX_CMDS = ['Que horas são?', 'Como está o tempo?', 'Tocar louvor', 'Parar', 'Aumentar o volume', 'Diminuir o volume'];
@@ -236,7 +240,7 @@ const CSS = `:host{
 .dv.ro{cursor:default}
 .dv.na{opacity:.5}
 /* Templo / Culto */
-.tpl{grid-template-columns:minmax(0,1fr) 370px;column-gap:18px}
+.tpl{grid-template-columns:minmax(0,1fr) 420px;column-gap:18px}
 .tleft{display:flex;flex-direction:column;gap:12px;min-height:0}
 .tleft .room{flex:1}
 .trow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;height:178px;flex:none}
@@ -303,6 +307,30 @@ const CSS = `:host{
 .mode.s svg{width:12px!important;height:12px!important}
 .splnote{font-size:11px;color:var(--tx2);margin-top:10px;line-height:1.45;border:1px dashed rgba(255,255,255,.18);border-radius:12px;padding:8px 10px}
 .splnote code{color:#dfeef0}
+/* v1.2: ⏻, Velocidade e Aleta (seletor) */
+.pw{width:34px;height:34px;border-radius:50%;display:grid!important;place-items:center;background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.14)!important;color:var(--tx2);flex:none;transition:background .2s,color .2s,box-shadow .2s}
+.pw svg{width:17px!important;height:17px!important;stroke-width:2.2!important}
+.pw.on{background:var(--mint)!important;color:#063126!important;border-color:var(--mint)!important;box-shadow:0 0 0 3px rgba(31,224,163,.18)}
+.spl .pw{width:30px;height:30px}
+.spl .pw svg{width:15px!important;height:15px!important}
+.xrow{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.xb{height:28px;border-radius:99px;display:flex!important;align-items:center;justify-content:center;gap:5px;font-size:11.5px;font-weight:500;background:rgba(255,255,255,.04)!important;border:1px solid var(--line)!important;color:var(--tx2);padding:0 9px!important;min-width:0;white-space:nowrap}
+.xb svg{width:13px!important;height:13px!important}
+.xb span{overflow:hidden;text-overflow:ellipsis}
+.xb small{font-size:10px;color:var(--tx3);font-weight:500}
+.xb.on{color:#dfeef0;border-color:rgba(31,224,163,.45)!important}
+.xb.open{background:rgba(31,224,163,.16)!important;border-color:var(--mint)!important;color:#fff}
+.spl{grid-template-columns:30px minmax(0,1fr) auto auto auto auto!important;gap:6px!important;padding:5px 6px!important}
+.spl .xb{height:26px;padding:0 7px!important;font-size:10.5px;max-width:86px;gap:4px}
+.spl.all{background:rgba(31,224,163,.06);border-color:rgba(31,224,163,.25)}
+.pop{position:absolute;z-index:70;min-width:150px;background:#0d2a2f;border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none}
+.pop.open{display:block}
+.pop h5{margin:2px 6px 6px;font:600 10px var(--f);letter-spacing:.12em;color:var(--tx3)}
+.pop button{display:flex!important;align-items:center;gap:8px;width:100%;height:32px;padding:0 10px!important;border-radius:9px;font-size:12.5px;color:#dfeef0}
+.pop button:hover{background:rgba(255,255,255,.06)!important}
+.pop button.on{background:var(--mint)!important;color:#063126!important;font-weight:600}
+.pop button svg{width:14px!important;height:14px!important}
+.ares .clim:not(.tplac) .xrow{margin-top:8px}
 .ares .spls{gap:8px;margin-top:12px}
 .ares .spl{padding:9px 10px}
 .ares .spl .sn b{font-size:13.5px}
@@ -356,6 +384,7 @@ const ICONS = `
 <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-swing" viewBox="0 0 24 24"><path d="M3.5 6.5h17"/><path d="M6 10.5 18 12M6 15.5l12-1.5M6 20l12-3"/></symbol>
 <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.6"/><path d="M12 10.4C10.5 6.5 11 3.5 13.6 3.5c2.5 0 2.4 3.6-1.6 6.9zM13.6 12.4c4.1-.6 7 .4 6.6 3-.4 2.4-3.8 1.3-6.6-3zM10.6 13c-2.5 3.3-5.3 4.5-6.6 2.3-1.2-2.2 2-3.8 6.6-2.3z"/></symbol>
 <symbol id="i-auto" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></symbol>
 <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
@@ -462,6 +491,7 @@ const HTML = `
     </section>
   </main>
   <div class="mbg" id="mbg"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+  <div class="pop" id="pop" role="listbox"></div>
   <div class="toast" id="toast" role="status"></div>
 </div></div>`;
 
@@ -566,7 +596,9 @@ class IgrejaPainelCard extends HTMLElement {
     S.telao = { state: tv ? tv.state : 'unavailable', title: ta.media_title || '', artist: ta.media_artist || ta.app_name || '', vol: ta.volume_level != null ? Math.round(ta.volume_level * 100) : null };
     for (const k of [...ACS, ...SPLITS]) { const s = this._st(k), a = (s && s.attributes) || {};
       S.ac[k] = { t: a.temperature != null ? Math.round(a.temperature) : '--', hvac: s ? s.state : 'unavailable', mode: HVAC_PT[s && s.state] || 'Frio', amb: a.current_temperature,
-        min: a.min_temp || 16, max: a.max_temp || 31, modes: a.hvac_modes || null }; }
+        min: a.min_temp || 16, max: a.max_temp || 31, modes: a.hvac_modes || null,
+        fan: a.fan_mode != null ? String(a.fan_mode) : null, fans: Array.isArray(a.fan_modes) && a.fan_modes.length ? a.fan_modes.map(String) : FAN_DEF,
+        swing: a.swing_mode != null ? String(a.swing_mode) : null, swings: Array.isArray(a.swing_modes) && a.swing_modes.length ? a.swing_modes.map(String) : SWING_DEF }; }
     const pr = this._st('presenca'); S.pres = pr ? pr.state === 'on' : null;
     const tp = this._st('temperatura'); S.temp = tp && !isNaN(+tp.state) ? Math.round(+tp.state * 10) / 10 : null;
     const po = this._st('porta'); S.porta = po ? po.state === 'on' : null;
@@ -582,7 +614,11 @@ class IgrejaPainelCard extends HTMLElement {
     S.splits = this._splits();
     if (S.splits.length) { S.on.ac_templo = S.on.ac_templo || S.splits.some((k) => S.on[k]); S.na.ac_templo = S.na.ac_templo && S.splits.every((k) => S.na[k]);
       if (S.ac.ac_templo.t === '--') { const f = S.splits.map((k) => S.ac[k]).find((a) => a.t !== '--'); if (f) Object.assign(S.ac.ac_templo, { t: f.t, min: f.min, max: f.max, modes: f.modes, amb: f.amb }); }
-      if (!this._st('ac_templo')) { const f = S.splits.find((k) => S.on[k]); S.ac.ac_templo.mode = f ? S.ac[f].mode : S.ac.ac_templo.mode; } }
+      if (!this._st('ac_templo')) { const f = S.splits.find((k) => S.on[k]) || S.splits[0], A = S.ac[f]; if (S.on[f]) S.ac.ac_templo.mode = A.mode;
+        Object.assign(S.ac.ac_templo, { fan: A.fan, fans: A.fans, swing: A.swing, swings: A.swings }); } }
+    // velocidade e aleta escolhidas: valem até o HA confirmar (ou 4 s)
+    for (const [k, o] of Object.entries(this._optA || {})) { const a = S.ac[k]; if (!a) continue;
+      for (const f of ['fan', 'swing']) if (o[f] != null) { if (now - o[f + 'T'] > 4000 || a[f] === o[f]) delete o[f]; else a[f] = o[f]; } }
     this.S = S;
   }
   _splits() { return SPLITS.filter((k) => this._ent[k]); }
@@ -674,7 +710,7 @@ class IgrejaPainelCard extends HTMLElement {
       plateia: { on: !!on.plateia, bri: sid ? ({ culto: 60, ensaio: 25 }[sid] || 100) : S.plateiaBri || 100 },
       telao: { on: !!on.telao, title: sid ? '' : (S.telao && S.telao.title) || '' },
       som: !!on.som,
-      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null) }])),
+      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null), fan: S.ac[k] ? S.ac[k].fan : null, swing: S.ac[k] ? S.ac[k].swing : null }])),
       porta: sid ? sid === 'chegada' : !!S.porta,
       night: sid ? true : S.night !== false,
     };
@@ -773,6 +809,12 @@ class IgrejaPainelCard extends HTMLElement {
     this._acKeys(k).forEach((x) => this._pendKey(x, true)); this._scene = null; this._call('climate', 'set_hvac_mode', { entity_id: this._acIds(k), hvac_mode: hv });
     this._toast(`${SPLITS.includes(k) ? 'A/C do Templo · ' : ''}${NAMES[k]}${k === 'ac_templo' && this.S.splits.length ? ' (todos)' : ''}: ${m}`);
   }
+  _acOpt(k, f, v) { this._optA = this._optA || {}; for (const x of [k, ...this._acKeys(k)]) { const o = this._optA[x] || (this._optA[x] = {}); o[f] = v; o[f + 'T'] = Date.now(); } }
+  _acFan(k, v) { this._acOpt(k, 'fan', v); this._scene = null; this._call('climate', 'set_fan_mode', { entity_id: this._acIds(k), fan_mode: v });
+    this._derive(); this._render(); this._toast(`${this._acLabel(k)}: velocidade ${ptOf(FAN_PT, v)}`); }
+  _acSwing(k, v) { this._acOpt(k, 'swing', v); this._scene = null; this._call('climate', 'set_swing_mode', { entity_id: this._acIds(k), swing_mode: v });
+    this._derive(); this._render(); this._toast(`${this._acLabel(k)}: aleta ${ptOf(SWING_PT, v)}`); }
+  _acLabel(k) { return SPLITS.includes(k) ? `A/C do Templo · ${NAMES[k]}` : NAMES[k] + (k === 'ac_templo' && this.S.splits.length ? ' (todos)' : ''); }
   _palcoColor(n) {
     const p = PRESETS.find((x) => x[0] === n), data = { entity_id: this._ent.palco };
     if (p[2] && n !== 'Quente') data.rgb_color = p[2]; else data.color_temp_kelvin = p[3];
@@ -785,14 +827,15 @@ class IgrejaPainelCard extends HTMLElement {
     if (!this._built || !this.S) return;
     const S = this.S, $ = (i) => this.$(i);
     const lit = LIGHTS.filter((l) => S.on[l]), acs = ACS.filter((k) => S.on[k]);
+    const units = acs.reduce((n, k) => n + (k === 'ac_templo' && S.splits.length ? S.splits.filter((x) => S.on[x]).length || 1 : 1), 0);   // cada split conta como uma unidade
     if (S.person) { $('usub').textContent = S.person; $('ava').textContent = S.person[0].toUpperCase(); }
-    $('nav-ac').textContent = acs.length;
+    $('nav-ac').textContent = units;
     // resumo
     $('st-p1').textContent = S.pres == null ? 'Templo' : S.pres ? 'Templo ocupado' : 'Templo vazio';
     $('st-p2').textContent = `Presença${S.temp != null ? ` · ${S.temp} °C` : ''}`; $('st-p-ic').classList.toggle('off', !S.pres);
     $('st-l').textContent = `${lit.length} ${lit.length === 1 ? 'luz acesa' : 'luzes acesas'}`;
     $('st-l2').textContent = `de ${LIGHTS.length}` + (lit.length ? ' · ' + lit.map((l) => NAMES[l]).join(', ') : ' · tudo apagado'); $('st-l-ic').classList.toggle('off', !lit.length);
-    $('st-ac').textContent = acs.length ? `${acs.length} A/C ${acs.length === 1 ? 'ligado' : 'ligados'}` : 'A/C desligados';
+    $('st-ac').textContent = units ? `${units} A/C ${units === 1 ? 'ligado' : 'ligados'}` : 'A/C desligados';
     $('st-ac2').textContent = acs.length ? acs.map((k) => `${AC_SHORT[k]} ${k === 'ac_templo' && S.splits.length ? S.splits.filter((x) => S.on[x]).length + '/' + S.splits.length : S.ac[k].t + '°'}`).join(' · ') : 'Templo, Pastoral, Mídia, Voluntariado'; $('st-ac-ic').classList.toggle('off', !acs.length);
     const culto = S.on.telao || S.on.som;
     $('st-c').textContent = culto ? 'Culto no ar' : 'Telão e som'; $('st-c2').textContent = `Telão ${S.on.telao ? (S.telao.title || 'ligado') : 'desligado'} · Som ${S.on.som ? 'ligado' : 'desligado'}`;
@@ -801,7 +844,7 @@ class IgrejaPainelCard extends HTMLElement {
     $('porta-t').textContent = S.porta == null ? '—' : S.porta ? 'aberta' : 'fechada';
     $('lg-on').textContent = `${lit.length} ${lit.length === 1 ? 'luz acesa' : 'luzes acesas'}`;
     $('lg-off').textContent = `${LIGHTS.length - lit.length} apagada${LIGHTS.length - lit.length === 1 ? '' : 's'}`;
-    const bits = []; if (S.on.palco) bits.push('o palco está aceso'); if (S.on.telao) bits.push('o telão está ligado'); if (acs.length) bits.push(acs.length === 1 ? 'um A/C está ligado' : `${acs.length} A/C estão ligados`);
+    const bits = []; if (S.on.palco) bits.push('o palco está aceso'); if (S.on.telao) bits.push('o telão está ligado'); if (units) bits.push(S.on.ac_templo && S.splits.length ? `A/C do Templo ${S.splits.filter((x) => S.on[x]).length}/${S.splits.length} ligados` + (units > S.splits.filter((x) => S.on[x]).length ? ` (${units} A/C no total)` : '') : units === 1 ? 'um A/C está ligado' : `${units} A/C estão ligados`);
     $('mood').textContent = bits.length ? bits.join(', ').replace(/^./, (c) => c.toUpperCase()) + '.' : (lit.length ? 'Algumas luzes acesas.' : 'Igreja fechada, tudo apagado.');
     $('wx').textContent = `Palmas (TO)${S.out != null ? ` · ${S.out} °C lá fora` : ''}`;
     // cenas
@@ -856,31 +899,69 @@ class IgrejaPainelCard extends HTMLElement {
       <div class="ctl"><button type="button" data-mp="media_previous_track" aria-label="Anterior" ${S.on.telao ? '' : 'disabled'}>${svg('prev')}</button><button type="button" class="pp" data-mp="media_play_pause" aria-label="Tocar ou pausar" ${S.on.telao ? '' : 'disabled'}>${svg(play ? 'pause' : 'play')}</button><button type="button" data-mp="media_next_track" aria-label="Próxima" ${S.on.telao ? '' : 'disabled'}>${svg('next')}</button></div>`;
     $('c-som').innerHTML = `<div class="top2"><div><b>Som</b><span>Mesa e caixas do templo</span></div><button type="button" class="tg ${S.on.som ? 'on' : ''}" data-t="som" aria-label="Ligar ou desligar o som"></button></div>
       <div class="big">${S.on.som ? 'Ligado' : 'Desligado'}</div><div class="sub2">Presença: ${S.pres == null ? '—' : S.pres ? 'ocupado' : 'vazio'}</div><div class="sub2">Temperatura: ${S.temp == null ? '—' : S.temp + ' °C'}</div>`;
-    this._renderAc($('c-actpl'), 'ac_templo', false);
+    this._renderAc($('c-actpl'), 'ac_templo', false, true);
   }
-  _renderAc(el, k, big) {
+  // botão ⏻ (mostra o estado) e botões com seletor: Modo, Velocidade e Aleta
+  _pw(k, on, n) { return `<button type="button" class="pw ${on ? 'on' : ''}" data-t="${k}" aria-pressed="${on}" aria-label="${on ? 'Desligar' : 'Ligar'} ${esc(n)}" title="${on ? 'Ligado — tocar para desligar' : 'Desligado — tocar para ligar'}">${svg('power')}</button>`; }
+  _xb(kind, k, row) {
+    const a = this.S.ac[k], on = !!this.S.on[k], n = this._acLabel(k);
+    if (kind === 'mode') { const M = MODES.find((x) => x[0] === a.mode) || MODES[0];
+      return `<button type="button" class="xb ${on ? 'on' : ''}" data-pop="mode" data-pk="${k}" aria-haspopup="listbox" aria-label="${esc(n)}: modo ${M[0]}" title="Modo: ${M[0]}">${svg(M[1])}<span>${M[0]}</span></button>`; }
+    const fan = kind === 'fan', v = fan ? ptOf(FAN_PT, a.fan) : ptOf(SWING_PT, a.swing), lab = fan ? 'Velocidade' : 'Aleta';
+    return `<button type="button" class="xb ${on ? 'on' : ''}" data-pop="${kind}" data-pk="${k}" aria-haspopup="listbox" aria-label="${esc(n)}: ${lab} ${v}" title="${lab}: ${v}">${svg(fan ? 'fan' : 'swing')}${row ? '' : `<small>${lab}</small>`}<span>${v}</span></button>`;
+  }
+  _acRow(k, label, all) {
+    const S = this.S, a = S.ac[k], on = !!S.on[k], na = S.na[k], t = this._local[k] != null ? this._local[k] : a.t;
+    return `<div class="spl ${on ? 'on' : ''} ${na ? 'na' : ''} ${all ? 'all' : ''}" data-split="${k}">${this._pw(k, on, all ? 'todos os splits' : label)}
+      <div class="sn"><b>${esc(label)}</b><span>${na ? 'Indisponível' : all ? `${S.splits.filter((x) => S.on[x]).length} de ${S.splits.length} ligados` : on ? 'Ligado' : 'Desligado'}</span></div>
+      <div class="st"><button type="button" class="rb s" data-tmp="${k}" data-d="-1" aria-label="${esc(label)}: diminuir temperatura">${svg('minus')}</button><b>${t}°</b><button type="button" class="rb s" data-tmp="${k}" data-d="1" aria-label="${esc(label)}: aumentar temperatura">${svg('plus')}</button></div>
+      ${this._xb('mode', k, true)}${this._xb('fan', k, true)}${this._xb('swing', k, true)}</div>`;
+  }
+  _renderAc(el, k, big, tpl) {
     if (!el) return; const S = this.S, a = S.ac[k], on = !!S.on[k], na = S.na[k], t = this._local[k] != null ? this._local[k] : a.t;
-    const amb = a.amb != null ? `ambiente ${Math.round(a.amb)} °C` : AC_ROOM[k];
+    const amb = a.amb != null ? `ambiente ${Math.round(a.amb)} °C` : AC_ROOM[k], sp = k === 'ac_templo' ? S.splits : [];
+    if (el.contains(this.shadowRoot.activeElement) && this._popK) return;   // não redesenha com o seletor aberto
     el.classList.toggle('off', !on); el.classList.toggle('na', na);
-    el.innerHTML = `<div class="top2"><div><b>${esc(NAMES[k])}</b><span>${esc(big ? AC_ROOM[k] : 'Climatização · ' + AC_ROOM[k])}${na ? ' · indisponível' : ''}</span></div><button type="button" class="tg ${on ? 'on' : ''}" data-t="${k}" aria-label="Ligar ou desligar ${esc(NAMES[k])}"></button></div>
+    const head = `<div class="top2"><div><b>${esc(NAMES[k])}</b><span>${esc(big ? AC_ROOM[k] : 'Climatização · ' + AC_ROOM[k])}${na ? ' · indisponível' : ''}</span></div>${this._pw(k, on, NAMES[k])}</div>`;
+    if (tpl && sp.length) { el.innerHTML = head + `<div class="spls">${this._acRow(k, 'Todos', true)}</div>` + this._splitsHtml(true); return; }   // Templo/Culto: compacto
+    el.innerHTML = head + `
       <div class="dial"><button type="button" class="rb" data-tmp="${k}" data-d="-1" aria-label="Diminuir temperatura">${svg('minus')}</button>
       <div class="temp"><b>${t}<sup>°C</sup></b><span>${on ? `${a.mode} · ${amb}` : `Desligado · ${amb}`}</span></div>
       <button type="button" class="rb" data-tmp="${k}" data-d="1" aria-label="Aumentar temperatura">${svg('plus')}</button></div>
-      <div class="modes">${MODES.map(([m, ic]) => `<button type="button" class="mode ${on && a.mode === m ? 'on' : ''}" data-ack="${k}" data-m="${m}">${svg(ic)}${m}</button>`).join('')}</div>` +
+      <div class="modes">${MODES.map(([m, ic]) => `<button type="button" class="mode ${on && a.mode === m ? 'on' : ''}" data-ack="${k}" data-m="${m}">${svg(ic)}${m}</button>`).join('')}</div>
+      <div class="xrow">${this._xb('fan', k)}${this._xb('swing', k)}</div>` +
       (k === 'ac_templo' ? this._splitsHtml() : '') +
-      (big || (k === 'ac_templo' && S.splits.length) ? '' : `<div class="mini"><span>${svg('radar')}Presença <b>${S.pres == null ? '—' : S.pres ? 'Ocupado' : 'Vazio'}</b></span><span>${svg('therm')}Templo <b>${S.temp == null ? '—' : S.temp + ' °C'}</b></span></div>`);
+      (big || tpl ? '' : `<div class="mini"><span>${svg('radar')}Presença <b>${S.pres == null ? '—' : S.pres ? 'Ocupado' : 'Vazio'}</b></span><span>${svg('therm')}Templo <b>${S.temp == null ? '—' : S.temp + ' °C'}</b></span></div>`);
   }
-  // v1.1: Ligar/Desligar todos e um controle por split (liga/desliga, temperatura, modo)
-  _splitsHtml() {
+  // v1.1: Ligar/Desligar todos e uma linha por split (⏻, temperatura, modo, velocidade, aleta)
+  _splitsHtml(compact) {
     const S = this.S, sp = S.splits, n = sp.filter((k) => S.on[k]).length;
     const head = `<div class="splh"><small>${sp.length ? `SPLITS · ${n}/${sp.length} LIGADOS` : 'TODOS OS SPLITS'}</small><button type="button" class="allb ${sp.length ? (n === sp.length ? 'on' : '') : (S.on.ac_templo ? 'on' : '')}" data-acall="on">Ligar todos</button><button type="button" class="allb ${(sp.length ? n === 0 : !S.on.ac_templo) ? 'on' : ''}" data-acall="off">Desligar todos</button></div>`;
     if (!sp.length) return head + '<div class="splnote">Controle separado dos 5 splits: informe <code>ac_templo_1</code> … <code>ac_templo_5</code> em <code>entities</code>. Sem eles, o A/C do Templo usa a entidade única <code>ac_templo</code>.</div>';
-    return head + '<div class="spls">' + sp.map((k) => { const a = S.ac[k], on = !!S.on[k], na = S.na[k], t = this._local[k] != null ? this._local[k] : a.t;
-      return `<div class="spl ${on ? 'on' : ''} ${na ? 'na' : ''}" data-split="${k}"><div class="sn"><b>${NAMES[k]}</b><span>${na ? 'Indisponível' : on ? a.mode : 'Desligado'}</span></div>
-        <div class="st"><button type="button" class="rb s" data-tmp="${k}" data-d="-1" aria-label="${NAMES[k]}: diminuir temperatura">${svg('minus')}</button><b>${t}°</b><button type="button" class="rb s" data-tmp="${k}" data-d="1" aria-label="${NAMES[k]}: aumentar temperatura">${svg('plus')}</button></div>
-        <div class="sm">${MODES.map(([m, ic]) => `<button type="button" class="mode s ${on && a.mode === m ? 'on' : ''}" data-ack="${k}" data-m="${m}" title="${m}" aria-label="${NAMES[k]}: ${m}">${svg(ic)}</button>`).join('')}</div>
-        <button type="button" class="tg ${on ? 'on' : ''}" data-t="${k}" aria-label="Ligar ou desligar ${NAMES[k]}"></button></div>`; }).join('') + '</div>';
+    return head + `<div class="spls${compact ? ' c' : ''}">` + sp.map((k) => this._acRow(k, NAMES[k])).join('') + '</div>';
   }
+  // seletor pequeno (Modo · Velocidade · Aleta): fica dentro do desenho 1280×800, fecha ao escolher, ao tocar fora e com Esc
+  _popOpen(btn) {
+    const kind = btn.dataset.pop, k = btn.dataset.pk, a = this.S.ac[k], pop = this.$('pop'), app = this.$('app');
+    if (this._popK === kind + ':' + k) { this._popClose(); return; }
+    const opts = kind === 'mode' ? MODES.map(([m, ic]) => [m, m, ic]) : kind === 'fan' ? a.fans.map((v) => [v, ptOf(FAN_PT, v), 'fan']) : a.swings.map((v) => [v, ptOf(SWING_PT, v), 'swing']);
+    const cur = kind === 'mode' ? (this.S.on[k] ? a.mode : null) : kind === 'fan' ? a.fan : a.swing;
+    pop.innerHTML = `<h5>${kind === 'mode' ? 'MODO' : kind === 'fan' ? 'VELOCIDADE' : 'ALETA'} · ${esc(this._acLabel(k).toUpperCase())}</h5>` +
+      opts.map(([v, l, ic]) => `<button type="button" role="option" aria-selected="${v === cur}" class="${v === cur ? 'on' : ''}" data-popv="${esc(v)}">${svg(ic)}${esc(l)}</button>`).join('');
+    this._popK = kind + ':' + k; this._popKind = kind; this._popKey = k;
+    this.shadowRoot.querySelectorAll('.xb.open').forEach((b) => b.classList.remove('open')); btn.classList.add('open');
+    pop.classList.add('open');
+    const s = app.getBoundingClientRect().width / app.offsetWidth || 1, A = app.getBoundingClientRect(), B = btn.getBoundingClientRect();
+    const W = app.offsetWidth, H = app.offsetHeight, pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let x = (B.left - A.left) / s, y = (B.bottom - A.top) / s + 6;
+    if (y + ph > H - 8) y = (B.top - A.top) / s - ph - 6;   // sem espaço embaixo: abre para cima
+    x = Math.max(8, Math.min(W - pw - 8, x)); y = Math.max(8, Math.min(H - ph - 8, y));
+    pop.style.left = x + 'px'; pop.style.top = y + 'px';
+    const f = pop.querySelector('button.on') || pop.querySelector('[data-popv]'); if (f) f.focus({ preventScroll: true });
+  }
+  _popClose() { const pop = this.$('pop'); if (!pop) return; const back = pop.contains(this.shadowRoot.activeElement) && this.shadowRoot.querySelector('.xb.open'); pop.classList.remove('open'); if (back) back.focus({ preventScroll: true }); this._popK = null; this.shadowRoot.querySelectorAll('.xb.open').forEach((b) => b.classList.remove('open')); }
+  _popPick(v) { const kind = this._popKind, k = this._popKey; this._popClose();
+    if (kind === 'mode') this._acMode(k, v); else if (kind === 'fan') this._acFan(k, v); else this._acSwing(k, v); }
   _clock() {
     if (!this._built) return;
     const tz = (this._hass && this._hass.config && this._hass.config.time_zone) || 'America/Araguaina', d = new Date();
@@ -908,6 +989,9 @@ class IgrejaPainelCard extends HTMLElement {
     app.addEventListener('click', (e) => {
       const q = (s) => e.target.closest(s);
       let x;
+      if ((x = q('[data-popv]'))) { this._popPick(x.dataset.popv); return; }
+      if ((x = q('[data-pop]'))) { e.stopPropagation(); this._popOpen(x); return; }
+      if (this._popK && !q('#pop')) this._popClose();   // tocar fora fecha o seletor
       if ((x = q('[data-blk]'))) { e.stopPropagation(); const b = x.dataset.blk, it = blockItems(b).filter((k) => TOG.includes(k)); this._block(b, !it.some((k) => this.S.on[k])); return; }
       if ((x = q('[data-t]'))) { e.stopPropagation(); this._toggle(x.dataset.t); return; }
       if ((x = q('.gl[data-k]'))) { if (this._dev(x.dataset.k).more) this._openModal(x.dataset.k); return; }
@@ -934,7 +1018,7 @@ class IgrejaPainelCard extends HTMLElement {
         if (e.target.matches('.gl[data-k]')) { e.preventDefault(); this._openModal(e.target.dataset.k); }
         else if (e.target.matches('[data-bsel]')) { e.preventDefault(); this._select('b:' + e.target.dataset.bsel); }
       }
-      if (e.key === 'Escape') this._closeModal();
+      if (e.key === 'Escape') { if (this._popK) this._popClose(); else this._closeModal(); }
     });
     for (const id of ['say-t', 'cmd-t']) for (const t of ['keydown', 'keyup', 'keypress']) this.$(id).addEventListener(t, (ev) => ev.stopPropagation());   // o HA não pega as teclas
     this.$('act-off').addEventListener('click', () => this._runScene('fechar'));
@@ -947,7 +1031,7 @@ class IgrejaPainelCard extends HTMLElement {
   }
   _go(nav) {
     if (nav === 'alexa' && !(this._config || {}).alexa_device) return;
-    this._nav = nav; const app = this.$('app');
+    this._popClose(); this._nav = nav; const app = this.$('app');
     app.className = 'p-' + nav;
     this.shadowRoot.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
     if (nav === 'rooms') { this._ambScroll = true; this._placeAmb(); }

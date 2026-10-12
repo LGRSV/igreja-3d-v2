@@ -7,25 +7,25 @@ mk('light.palco_rgb', 'on', { friendly_name: 'Palco RGB', rgb_color: [140, 60, 2
 mk('light.templo_plateia', 'on', { friendly_name: 'Plateia', brightness: 77, supported_color_modes: ['brightness'] }, 6);
 mk('media_player.telao_led', 'playing', { friendly_name: 'Telão LED', media_title: 'Louvor — Base Music', volume_level: 0.6 }, 6);
 mk('switch.som_templo', 'on', { friendly_name: 'Som do templo' }, 40);
-mk('climate.ar_templo', 'cool', { friendly_name: 'Ar do templo', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], swing_mode: 'on', swing_modes: ['off', 'on'] }, 55);
+mk('climate.ar_templo', 'cool', { friendly_name: 'Ar do templo', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }, 55);
 // os 5 splits do templo (entities ac_templo_1…5 do painel): 2 ligados e 3 desligados
-mk('climate.ar_templo_1', 'cool', { friendly_name: 'A/C do templo · split 1', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
-mk('climate.ar_templo_2', 'cool', { friendly_name: 'A/C do templo · split 2', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
-mk('climate.ar_templo_3', 'off', { friendly_name: 'A/C do templo · split 3', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
-mk('climate.ar_templo_4', 'off', { friendly_name: 'A/C do templo · split 4', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
-mk('climate.ar_templo_5', 'off', { friendly_name: 'A/C do templo · split 5', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
+mk('climate.ar_templo_1', 'cool', { friendly_name: 'A/C do templo · split 1', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'low', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 55);
+mk('climate.ar_templo_2', 'cool', { friendly_name: 'A/C do templo · split 2', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'high', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'on', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }, 55);
+mk('climate.ar_templo_3', 'off', { friendly_name: 'A/C do templo · split 3', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'medium', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 55);
+mk('climate.ar_templo_4', 'off', { friendly_name: 'A/C do templo · split 4', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }, 55);
+mk('climate.ar_templo_5', 'off', { friendly_name: 'A/C do templo · split 5', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], fan_mode: 'low', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'on', swing_modes: ['off', 'on'] }, 55);
 mk('light.hall_entrada', 'on', { friendly_name: 'Hall de entrada' }, 70);
 mk('light.fachada_letreiro', 'on', { friendly_name: 'Fachada / letreiro' }, 95);
 mk('light.estacionamento', 'on', { friendly_name: 'Estacionamento' }, 95);
 mk('light.sala_pastoral', 'off', { friendly_name: 'Sala pastoral' }, 180);
-mk('climate.ar_sala_pastoral', 'off', { friendly_name: 'Ar da sala pastoral', temperature: 23, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 180);
+mk('climate.ar_sala_pastoral', 'off', { friendly_name: 'Ar da sala pastoral', temperature: 23, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry'], fan_mode: 'high', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }, 180);
 mk('light.recepcao', 'off', { friendly_name: 'Recepção' }, 175);
 mk('light.administrativo', 'off', { friendly_name: 'Administrativo' }, 190);
 mk('light.circulacao', 'on', { friendly_name: 'Circulação' }, 80);
 mk('light.sala_midia', 'on', { friendly_name: 'Sala de mídia' }, 60);
-mk('climate.ar_midia', 'off', { friendly_name: 'Ar da mídia', temperature: 21, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 60);
+mk('climate.ar_midia', 'off', { friendly_name: 'Ar da mídia', temperature: 21, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry'], fan_mode: 'medium', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 60);
 mk('light.voluntariado', 'off', { friendly_name: 'Voluntariado' }, 50);
-mk('climate.ar_voluntariado', 'off', { friendly_name: 'Ar do voluntariado', temperature: 23, current_temperature: 27.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat'], swing_mode: 'off', swing_modes: ['off', 'on'] }, 50);
+mk('climate.ar_voluntariado', 'off', { friendly_name: 'Ar do voluntariado', temperature: 23, current_temperature: 27.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat'], fan_mode: 'auto', fan_modes: ['auto', 'low', 'medium', 'high'], swing_mode: 'on', swing_modes: ['off', 'on', 'vertical', 'horizontal', 'both'] }, 50);
 mk('light.cozinha', 'off', { friendly_name: 'Cozinha' }, 120);
 mk('light.banheiros', 'on', { friendly_name: 'Banheiros' }, 75);
 mk('binary_sensor.presenca_templo', 'on', { friendly_name: 'Presença no templo', device_class: 'occupancy' }, 58);
@@ -63,6 +63,7 @@ function callService(domain, service, data) {
   else if (service === 'turn_off') later(() => set('off'));
   else if (service === 'set_hvac_mode') later(() => set(data.hvac_mode));
   else if (service === 'set_temperature') later(() => set(s.state, { temperature: data.temperature }));
+  else if (service === 'set_fan_mode') later(() => set(s.state, { fan_mode: data.fan_mode }));   // velocidade (simulado)
   else if (service === 'set_swing_mode') later(() => set(s.state, { swing_mode: data.swing_mode }));   // oscilar (simulado)
   else if (service === 'media_play_pause') later(() => set(s.state === 'playing' ? 'paused' : 'playing'));
   else if (service === 'volume_up') set(s.state, { volume_level: Math.min(1, +((s.attributes.volume_level || 0.3) + 0.05).toFixed(2)) });

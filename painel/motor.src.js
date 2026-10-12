@@ -50,9 +50,6 @@ class P3View {
     this.cam = new THREE.PerspectiveCamera(o.fov || 32, 1, 0.1, 600);
     this.az = 90; this.el = 58; this.zoom = 1; this.dist = 60; this.target = new THREE.Vector3(); this.rect = PLAN3D.slice(0, 4);
     this.state = o.state || null; this._cam = null; this._click = null; this._cutRoom = null; this._clip = null; this._h = [];
-    // M4: vista inativa não desenha nem anima (setActive); miniatura (thumb: true, ou vista não interativa) não anima, desenha
-    // menor e só refaz quando o estado dela muda (debounce de 500 ms)
-    this.active = o.active !== false; this.thumb = o.thumb != null ? !!o.thumb : !o.interactive;
     if (o.home) { this.az = o.home[0]; this.el = o.home[1]; }
     if (o.interactive) this._bind();
   }
@@ -143,8 +140,7 @@ class P3View {
     }
     this.render(); return this;
   }
-  render(force) { this.E._queue(this, force); }
-  setActive(on) { on = !!on; const was = this.active; this.active = on; if (on && !was) { this._sig = null; this.render(true); } else if (!on) this.E._dirty.delete(this); return this; }
+  render() { this.E._queue(this); }
   setZoom(z) { this.zoom = Math.max(0.6, Math.min(4, z)); if (this._sync()) this._place(...this._wh); this._moved(); }
   _moved() { this.render(); if (this._cam) this._cam(this); }
   _on(t, f, o) { this.c.addEventListener(t, f, o); this._h.push([t, f, o]); }
@@ -181,13 +177,7 @@ class P3View {
 export class IgrejaPainel3D {
   static shared(opts) { if (!window.__igrejaPainel3D) window.__igrejaPainel3D = new IgrejaPainel3D(opts); return window.__igrejaPainel3D; }
   constructor(opts = {}) {
-    this.opts = opts; this.views = new Set(); this._dirty = new Map(); this.segs = []; this._gen = 0;
-    // aba escondida: nada desenha nem anima; ao voltar, as vistas ativas que ficaram para trás desenham uma vez
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
-      if (document.hidden || !this.scene) return;
-      this.views.forEach((v) => { if (v.active && v._stale) v.render(true); });
-      if (this._airAnim && this._airAnim.size) this._airLoop(); else this._swingCheck();
-    });
+    this.opts = opts; this.views = new Set(); this._dirty = new Set(); this.segs = [];
     this.version = VERSION;
   }
   ready() {
@@ -648,10 +638,6 @@ export class IgrejaPainel3D {
     const H0 = this.host, W = this._acWants(st, key), w = W.map((u) => u.on), hv = rt.hvacOn || rt.hvac;
     const col = hv === 'cool' ? 0x67d3ff : hv === 'heat' ? 0xff8a5b : 0x8ef0b0;
     this._acPrev = this._acPrev || new Map(); this._airCol = this._airCol || new Map(); this._airCol.set(key, col); this._nl = nl;
-    if (this._thumbMode) {   // miniatura: o ar aparece como fica no fim, sem animar (o estado real volta no _acRestore)
-      rt.on = w.some(Boolean); rt.p3sp = rt.p3spc = p3Fan((W.find((u) => u.on) || W[0] || {}).fan); rt.p3swing = W.map(() => false);
-      rt.seq = { t0: now, off: w.map((on) => (on ? -1e9 : Infinity)) }; rt.snap = true; H0._airStep(rt, col, now, 0, nl, key); this._airPost(rt, now); return;
-    }
     const prev = this._acPrev.get(key); this._acPrev.set(key, w);
     rt.on = w.some(Boolean);
     const first = W.find((u) => u.on) || W[0] || {}, sp = p3Fan(first.fan);
@@ -693,7 +679,7 @@ export class IgrejaPainel3D {
     for (const key of AC_KEYS) {
       const rt = this.host._items.get(key); if (!rt || !rt.p3swing || !rt.p3swing.some(Boolean)) continue;
       for (const v of this.views) {
-        if (!v.active || v.thumb || !v.c.isConnected || !v._wh) continue; const cb = v._clipBox;
+        if (!v.c.isConnected || !v._wh) continue; const cb = v._clipBox;
         for (let i = 0; i < rt.airUnits.length; i++) {
           if (!rt.p3swing[i]) continue; const p = rt.airUnits[i].p;
           if (cb && (p.x < cb[0] || p.x > cb[2] || p.z < cb[1] || p.z > cb[3])) continue;
@@ -711,11 +697,10 @@ export class IgrejaPainel3D {
     const H0 = this.host; this._airAnim = this._airAnim || new Set();
     const step = () => {
       const now = performance.now();
-      if (typeof document !== 'undefined' && document.hidden) { this._airRaf = 0; this._airLast = 0; return; }   // volta no visibilitychange
       let more = this._airAnim.size > 0;
       if (now - (this._airLast || 0) >= 50) {
         const dt = Math.min((now - (this._airLast || now)) / 1000, 0.1); this._airLast = now;
-        const swingOn = this._swingVisible(), pts = [], ended = [];
+        const swingOn = this._swingVisible();
         for (const key of AC_KEYS) {
           const rt = H0._items.get(key); if (!rt || !rt.airUnits) continue;
           const anim = this._airAnim.has(key), sw = swingOn && rt.p3swing && rt.p3swing.some(Boolean);
@@ -725,18 +710,10 @@ export class IgrejaPainel3D {
           this._airPost(rt, now);
           rt.p3t = ((rt.p3t || 0) + dt * (rt.p3spc || 1)) % 1000;   // relógio do fluxo na velocidade do fan
           if (rt.airMesh) rt.airMesh.material.uniforms.uT.value = rt.p3t; if (rt.airPts) rt.airPts.material.uniforms.uT.value = rt.p3t;
-          rt.airUnits.forEach((u, i) => { if (anim || (rt.p3swing && rt.p3swing[i])) pts.push(u.p); });
-          if (anim && !busy && now > (rt.airUntil || 0) && Math.abs((rt.p3sp || 1) - (rt.p3spc || 1)) < 0.01) { this._airAnim.delete(key); ended.push(key); }
+          if (anim && !busy && now > (rt.airUntil || 0) && Math.abs((rt.p3sp || 1) - (rt.p3spc || 1)) < 0.01) this._airAnim.delete(key);
         }
         more = this._airAnim.size > 0 || swingOn;
-        const vv = new THREE.Vector3();
-        for (const v of this.views) {
-          if (v.thumb || !v._wh || !v.c.isConnected) continue;
-          const cb = v._clipBox, sees = pts.some((p) => { if (cb && (p.x < cb[0] || p.x > cb[2] || p.z < cb[1] || p.z > cb[3])) return false; vv.copy(p).project(v.cam); return vv.z < 1 && Math.abs(vv.x) <= 1.05 && Math.abs(vv.y) <= 1.05; });
-          if (!sees) continue;
-          if (v.active) this._queueNow(v, true); else v._stale = true;
-        }
-        if (ended.length) for (const v of this.views) if (v.thumb) { if (v.active) this._queueNow(v, true); else v._stale = true; }   // miniaturas: uma vez no fim
+        this.views.forEach((v) => v.render());
       }
       if (more) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
     };
@@ -762,75 +739,27 @@ export class IgrejaPainel3D {
     }
   }
 
-  _queue(v, force) {
-    if (!v.active || (typeof document !== 'undefined' && document.hidden)) { v._stale = true; return; }
-    if (v.thumb && v.drawn && !force) {   // miniatura: junta as mudanças por 500 ms
-      if (!v._tq) v._tq = setTimeout(() => { v._tq = 0; this._queueNow(v, false); }, 500);
-      return;
-    }
-    this._queueNow(v, force);
+  _queue(v) {
+    this._dirty.add(v);
+    if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; const L = [...this._dirty]; this._dirty.clear(); for (const x of L) { try { this._draw(x); } catch (e) { console.warn('igreja-painel-3d: render', e); } } });
   }
-  _queueNow(v, force) {
-    if (!v.active) { v._stale = true; return; }
-    this._dirty.set ? null : (this._dirty = new Map());
-    this._dirty.set(v, !!(force || this._dirty.get(v)));
-    if (!this._raf) this._raf = requestAnimationFrame(() => {
-      this._raf = 0; const L = [...this._dirty]; this._dirty.clear();
-      for (const [x, f] of L) { try { this._draw(x, f); } catch (e) { console.warn('igreja-painel-3d: render', e); } }
-    });
-  }
-  // assinatura do que a vista mostra: sem mudança de estado, câmera, tamanho ou corte, não redesenha (repouso = custo zero)
-  _sigOf(v, pw, ph) {
-    const e = v.cam.matrixWorld.elements, st = v.state ? v.state() : null;
-    return JSON.stringify(st) + '|' + e.map((x) => x.toFixed(4)).join(',') + '|' + pw + 'x' + ph + '|' + (v._cutRoom || '') + '|' + v.zoom + '|' + this._gen;
-  }
-  _draw(v, force) {
-    if (!this.scene || !v.c.isConnected || !v.active) return;
+  _draw(v) {
+    if (!this.scene || !v.c.isConnected) return;
     if (!v._sync()) return;
-    const [w, h] = v._wh, s = v._size().s || 1, dpr = window.devicePixelRatio || 1;
-    // resolução: até 1,5× nas vistas grandes, até 1× nas miniaturas (que também podem ir menores com res < 1)
-    let k = v.thumb ? Math.min(1, s * dpr) * Math.min(1, v.o.res || 1) : s * Math.min(1.5, dpr) * Math.min(v.o.res || 1, 1.5);
-    const maxW = v.o.maxPx || 1800; if (w * k > maxW) k = maxW / w;
+    const [w, h] = v._wh, s = v._size().s || 1, dpr = Math.min(2, window.devicePixelRatio || 1);
+    let k = s * dpr * (v.o.res || 1); const maxW = v.o.maxPx || 1800; if (w * k > maxW) k = maxW / w;
     const pw = Math.max(2, Math.round(w * k)), ph = Math.max(2, Math.round(h * k));
-    const sig = this._sigOf(v, pw, ph);
-    if (!force && sig === v._sig && !v._stale) return;
-    v._sig = sig; v._stale = false;
     if (v.c.width !== pw || v.c.height !== ph) { v.c.width = pw; v.c.height = ph; }
     const R = this.renderer, cv = R.domElement;
     if (cv.width < pw || cv.height < ph) R.setSize(Math.max(cv.width, pw), Math.max(cv.height, ph), false);
-    const saved = v.thumb ? this._acSave() : null;   // miniatura com estado de cena: o ar dela não pode disparar/atrapalhar a animação das outras
-    if (saved) this._thumbMode = true;
-    try {
-      this._prep(v);
-      R.clippingPlanes = v._clip || [];
-      R.setViewport(0, 0, pw, ph); R.setScissor(0, 0, pw, ph); R.setScissorTest(true);
-      R.render(this.scene, v.cam);
-      R.clippingPlanes = [];
-    } finally { if (saved) { this._thumbMode = false; this._acRestore(saved); } }
+    this._prep(v);
+    R.clippingPlanes = v._clip || [];
+    R.setViewport(0, 0, pw, ph); R.setScissor(0, 0, pw, ph); R.setScissorTest(true);
+    R.render(this.scene, v.cam);
+    R.clippingPlanes = [];
     v.g2.clearRect(0, 0, pw, ph);
     v.g2.drawImage(cv, 0, cv.height - ph, pw, ph, 0, 0, pw, ph);
     v.drawn = (v.drawn || 0) + 1;
-    if (!this._airRaf && this._acPrev && !v.thumb) this._swingCheck();
-  }
-  // estado temporal dos ares (o resto do _apply é instantâneo): guardado em volta do desenho de uma miniatura
-  _acSave() {
-    const H0 = this.host, out = { keys: [], prev: this._acPrev ? new Map(this._acPrev) : null, key: this._key };
-    for (const key of AC_KEYS) {
-      const rt = H0._items.get(key); if (!rt || !rt.airUnits) continue;
-      out.keys.push([key, rt, { U: rt.airUnits.map((u) => [u.led, u.f, u.g, u.on, u.ign]), seq: rt.seq, on: rt.on, hvac: rt.hvac, hvacOn: rt.hvacOn,
-        p3sp: rt.p3sp, p3spc: rt.p3spc, p3swing: rt.p3swing, airUntil: rt.airUntil, col: this._airCol && this._airCol.get(key) }]);
-    }
-    return out;
-  }
-  _acRestore(sv) {
-    const H0 = this.host, now = performance.now();
-    for (const [key, rt, d] of sv.keys) {
-      rt.airUnits.forEach((u, i) => { [u.led, u.f, u.g, u.on, u.ign] = d.U[i]; });
-      Object.assign(rt, { seq: d.seq, on: d.on, hvac: d.hvac, hvacOn: d.hvacOn, p3sp: d.p3sp, p3spc: d.p3spc, p3swing: d.p3swing, airUntil: d.airUntil, snap: false });
-      if (d.col != null) { this._airCol.set(key, d.col); H0._airStep(rt, d.col, now, 0, this._nl == null ? 1 : this._nl, key); this._airPost(rt, now); }
-    }
-    if (sv.prev) this._acPrev = sv.prev;
-    this._key = null;   // a próxima vista normal reaplica as luzes do estado dela
-  }
+    if (!this._airRaf && this._acPrev) this._swingCheck();
   }
 }

@@ -14,7 +14,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={'width': 1280, 'height': 800}); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(url); pg.wait_for_function('window.__pronto === true && window.__card && window.__card._p3room', timeout=90000); pg.wait_for_timeout(5000)
-    pg.evaluate("async () => { const m = await import('./igreja-painel-3d.js?v=1.0.0'); window.__R = Object.assign({}, m.ROOMS3D, m.BLOCKS3D); }")
+    pg.evaluate("async () => { const m = await import('./igreja-painel-3d.js?v=1.0.1'); window.__R = Object.assign({}, m.ROOMS3D, m.BLOCKS3D); }")
     for id in ['templo', 'operacional', 'hall', 'midia', 'pastoral']:
         ns = []
         for z in [1, 1.6, 2.5, 4]:

@@ -7,7 +7,7 @@
  * Entidades e blocos = os do igreja3d-card v1.8 (templo · operacional · banheiro · pastoral · hall).
  */
 const IGP_VERSION = '1.0.0'; // v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, Ares, Alexa
-const P3_URL = new URL('igreja-painel-3d.js?v=1.0.0', import.meta.url).href;
+const P3_URL = new URL('igreja-painel-3d.js?v=1.0.1', import.meta.url).href;
 
 // ---------- entidades (iguais ao README do igreja3d-card, "Configuração completa") ----------
 const ENT = {

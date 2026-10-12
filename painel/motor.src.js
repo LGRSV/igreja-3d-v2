@@ -7,7 +7,7 @@
 // aparelhos (pickAt), cortes de parede entre a câmera e o foco (casa de boneca) e o corte só no cômodo (cut).
 // Coordenadas em metros como no cartão: X → direita (muro x = 0 até 20,1), Z → frente (fachada em z ≈ 49,7), Y para cima.
 // ===========================================================================
-export const VERSION = '1.0.0';
+export const VERSION = '1.0.1';
 const P3_CUT = 0.9;   // altura das paredes cortadas (abaixo dos peitoris de 1,0 m: a tampa cobre as janelas)
 const P3_DEG = Math.PI / 180;
 const P3_TUNE = { ty: 0.2, grid: 0.5, maxN: 24, ins: 0.15, part: 0.6, overview: 0.3 };
@@ -423,15 +423,18 @@ export class IgrejaPainel3D {
     const lotA = (LOT.x1 - LOT.x0) * (LOT.z1 - LOT.z0), overview = (v.rect[2] - v.rect[0]) * (v.rect[3] - v.rect[1]) > P3_TUNE.overview * lotA;
     const nx = Math.max(3, Math.min(P3_TUNE.maxN, Math.ceil((x1 - x0) / P3_TUNE.grid) + 1)), nz = Math.max(3, Math.min(P3_TUNE.maxN, Math.ceil((z1 - z0) / P3_TUNE.grid) + 1));
     let sig = '';
+    // v1.0.1: paredes e fachada ficam de pé por padrão (como no igreja3d-card); o corte automático só vale com { cuts: true }
+    // ou na vista recortada num cômodo (Ambientes), onde só as paredes do próprio cômodo poderiam tapar a vista
+    const cutsOn = v.o.cuts === true || (!!v._clipBox && v.o.cuts !== false);
     for (const W of this.segs) {
       const ax = W.axis === 'x', [p0, p1, q0, q1] = ax ? [z0, z1, x0, x1] : [x0, x1, z0, z1];
-      let hit = v.o.cuts === false ? false : !overview && W.c > p0 + P3_TUNE.part && W.c < p1 - P3_TUNE.part && Math.min(W.a1, q1) - Math.max(W.a0, q0) > 0.4;
+      let hit = !cutsOn ? false : !overview && W.c > p0 + P3_TUNE.part && W.c < p1 - P3_TUNE.part && Math.min(W.a1, q1) - Math.max(W.a0, q0) > 0.4;
       if (v._clipBox && !hit) {   // corte no cômodo: só os trechos que sobram dentro da caixa contam
         const [bx0, bz0, bx1, bz1] = v._clipBox, inBox = ax ? W.c > bz0 && W.c < bz1 && W.a1 > bx0 && W.a0 < bx1 : W.c > bx0 && W.c < bx1 && W.a1 > bz0 && W.a0 < bz1;
         if (!inBox) { sig += '0'; this._setCut(W, false); continue; }
       }
       const cu = ax ? C.z : C.x, ca = ax ? C.x : C.z, d0 = cu - W.c;
-      if (!hit && v.o.cuts !== false && Math.abs(d0) > W.t / 2 && (d0 > 0 ? p0 < W.c : p1 > W.c)) {
+      if (!hit && cutsOn && Math.abs(d0) > W.t / 2 && (d0 > 0 ? p0 < W.c : p1 > W.c)) {
         for (let i = 0; i < nx && !hit; i++) for (let j = 0; j < nz && !hit; j++) {
           const px = x0 + ins + (x1 - x0 - 2 * ins) * i / (nx - 1), pz = z0 + ins + (z1 - z0 - 2 * ins) * j / (nz - 1);
           const pa = ax ? px : pz, pu = ax ? pz : px, d1 = pu - W.c;
@@ -476,6 +479,9 @@ export class IgrejaPainel3D {
       const n = it.face && !o.userData.ground ? it.face.normal.clone().transformDirection(o.matrixWorld) : null;
       const gx = n && Math.abs(n.y) < 0.5 ? p.x + n.x * 0.15 : p.x, gz = n && Math.abs(n.y) < 0.5 ? p.z + n.z * 0.15 : p.z;
       let room = p3RoomAt(gx, gz);
+      if (o.userData.seg != null) {   // v1.0.1: tocou numa parede em pé → vale o cômodo do chão sob o dedo (o que a pessoa está apontando)
+        const g = v.pick(px, py), r2 = g && p3RoomAt(g[0], g[1]); if (r2) room = r2;
+      }
       if (v._cutRoom && ROOMS3D[v._cutRoom] && room !== v._cutRoom) room = v._cutRoom;   // corte no cômodo: o que sobra é dele
       if (key && !zone) {
         const itm = ITEMS.find((x) => x.key === key), kind = itm && P3_KIND[itm.kind];

@@ -6,7 +6,7 @@
  * sem o motor fica uma planta 2D desenhada aqui mesmo (mesma API de vista).
  * Entidades e blocos = os do igreja3d-card v1.8 (templo · operacional · banheiro · pastoral · hall).
  */
-const IGP_VERSION = '1.2.0'; // v1.2.0: em cada A/C o botão ⏻, Velocidade (fan_modes) e Aleta (swing_modes) com seletor; modo do split também no seletor · v1.1.0: v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
+const IGP_VERSION = '1.3.0'; // v1.3.0: layout de celular (coluna com rolagem, abas embaixo, seletores e janelas de baixo para cima, 3D com resolução menor e rolagem por cima); miniaturas mais leves · v1.2.0: v1.2.0: em cada A/C o botão ⏻, Velocidade (fan_modes) e Aleta (swing_modes) com seletor; modo do split também no seletor · v1.1.0: v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
 const P3_URL = new URL('igreja-painel-3d.js?v=1.0.1', import.meta.url).href;
 
 // ---------- entidades (iguais ao README do igreja3d-card, "Configuração completa") ----------
@@ -367,6 +367,53 @@ const CSS = `:host{
 .toast{position:absolute;left:50%;bottom:18px;transform:translate(-50%,20px);background:#0d2a2f;border:1px solid rgba(31,224,163,.45);color:#dff7ee;font-size:12.5px;font-weight:500;padding:9px 16px;border-radius:99px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;white-space:nowrap;pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion: reduce){.tg::after,.toast,.sheet{transition:none}}
+/* ---------- celular (v1.3.0): coluna única com rolagem, abas embaixo, gavetas de baixo para cima ---------- */
+#app.m{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#app.m .side{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;height:auto;padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));flex-direction:row;border-right:0;border-top:1px solid var(--line);z-index:40;background:rgba(7,28,31,.97)}
+#app.m .side .user,#app.m .side .sec,#app.m .side .foot{display:none}
+#app.m .nav{display:flex;width:100%;justify-content:space-around}
+#app.m .nav a{flex:1;flex-direction:column;justify-content:center;height:56px;gap:3px;padding:4px 2px;margin:0;font-size:10.5px;position:relative;text-align:center;border-radius:12px}
+#app.m .nav a svg{width:21px;height:21px}
+#app.m .nav a .cnt{position:absolute;top:3px;left:calc(50% + 6px);margin:0;font-size:9px;padding:1px 5px}
+#app.m .main{position:static;width:auto;height:auto;padding:14px 14px calc(84px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+#app.m .head{gap:10px}
+#app.m .head h2{font-size:22px}
+#app.m .head p{font-size:12.5px;line-height:1.4}
+#app.m .clock b{font-size:22px}
+#app.m .clock > span{margin-top:4px}
+#app.m .chips{flex-wrap:wrap}
+#app.m.p-home .stats,#app.m .scenes{display:flex;overflow-x:auto;gap:10px;margin:0 -14px;padding:0 14px 2px;scroll-snap-type:x proximity;scrollbar-width:none}
+#app.m .stats::-webkit-scrollbar,#app.m .scenes::-webkit-scrollbar,#app.m .tabs::-webkit-scrollbar{display:none}
+#app.m .stats>*{flex:0 0 auto;width:172px;height:64px;scroll-snap-align:start}
+#app.m .scene{flex:0 0 134px;scroll-snap-align:start}
+#app.m.p-home .lower{display:flex;flex-direction:column;gap:14px}
+#app.m .room{flex:none;height:auto;display:flex;flex-direction:column}
+#app.m .room .pv{position:relative;inset:auto;height:min(52vh,330px);flex:none}
+#app.m .scrim-b{top:calc(min(52vh,330px) - 90px);bottom:auto}
+#app.m .ctrls{position:static;width:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;overflow:visible;z-index:3}
+#app.m .tabs{top:calc(min(52vh,330px) - 46px);bottom:auto;left:10px;right:10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+#app.m .tabs > *{flex:none}
+#app.m .pv canvas.p3{touch-action:pan-y}
+#app.m .plan .pv{height:230px}
+#app.m.p-rooms .amb,#app.m.p-templo .tpl,#app.m.p-ares .ares,#app.m.p-alexa .alx{display:flex;flex-direction:column;gap:14px}
+#app.m .amb .room,#app.m .tleft .room{flex:none;height:auto}
+#app.m .alist{overflow:visible;padding:0}
+#app.m .tleft,#app.m .tright{min-height:0}
+#app.m .trow{grid-template-columns:minmax(0,1fr);height:auto}
+#app.m .ares .tplac{grid-row:auto}
+#app.m .ares .clim{min-height:0}
+#app.m .spl{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px 8px!important}
+#app.m .spl > :nth-child(2){flex:1 1 auto;min-width:0}
+#app.m .spl > .xb{flex:1 1 0;min-width:0;height:34px}
+#app.m .pop{position:fixed;left:10px!important;right:10px;top:auto!important;bottom:calc(72px + env(safe-area-inset-bottom,0px));min-width:0;max-height:60vh;overflow:auto;padding:8px;border-radius:18px}
+#app.m .pop button{height:46px;font-size:14px}
+#app.m .splh{flex-wrap:wrap;row-gap:8px}
+#app.m .splh small{flex:1 0 100%}
+#app.m .splh .allb{flex:1 1 0;height:38px;text-align:center}
+#app.m .mbg{position:fixed;place-items:end stretch}
+#app.m .sheet{width:auto;max-height:86vh;overflow:auto;border-radius:22px 22px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+#app.m .toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+@media (prefers-reduced-motion:reduce){#app.m .stats,#app.m .scenes{scroll-behavior:auto}}
 `;
 const ICONS = `
 <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
@@ -655,6 +702,10 @@ class IgrejaPainelCard extends HTMLElement {
   _fit() {
     const app = this.$('app'); if (!app) return;
     const W = this.clientWidth, H = this.clientHeight; if (!W || !H) return;
+    // v1.3.0: no celular (tela estreita ou baixa) o desenho de 1280×800 ficaria minúsculo — vira uma coluna com rolagem, sem escala
+    const mob = this._config && this._config.layout ? this._config.layout === 'celular' : (W < 700 || H < 520);
+    if (mob !== this._mob) { this._mob = mob; app.classList.toggle('m', mob); this._safeFor(mob); }
+    if (mob) { app.style.width = W + 'px'; app.style.height = H + 'px'; app.style.transform = 'none'; this._p3resize(); return; }
     const s = Math.min(W / 1280, H / 800);   // escala pelo lado limitante e o layout estica no outro (ocupa a área toda, sem tarjas)
     app.style.width = (W / s) + 'px'; app.style.height = (H / s) + 'px';
     app.style.transform = `scale(${s})`; this._p3resize();
@@ -677,6 +728,12 @@ class IgrejaPainelCard extends HTMLElement {
     return (m.ROOMS3D && m.ROOMS3D[id] || frameOf(RM[id].box)).slice();
   }
   _p3canvas(pv) { pv.querySelectorAll('canvas.p3').forEach((c) => c.remove()); const cv = document.createElement('canvas'); cv.className = 'p3'; pv.prepend(cv); return cv; }
+  _safeFor(mob) {
+    const v = this._p3room; if (!v || !v.o) return;
+    v.o.safe = mob ? { l: 10, t: 70, r: 10, b: 52 } : { l: 14, t: 76, r: 200, b: 52 };
+    const r = mob ? 0.8 : 1; [this._p3room, this._p3plan, this._p3amb, this._p3tpl].forEach((x) => { if (x && x.o) x.o.res = r; });
+    (this._p3thumbs || []).forEach((x) => { if (x && x.o) x.o.res = mob ? 0.6 : 1; });
+  }
   _p3setup() {
     const E = this._p3, st = () => this._p3state();
     const mk = (id, o) => { const v = E.view(this._p3canvas(this.$(id)), Object.assign({ state: st }, o)); return v; };
@@ -691,8 +748,9 @@ class IgrejaPainelCard extends HTMLElement {
     this._p3tpl = mk('tpl-pv', { interactive: true, safe: { l: 14, t: 70, r: 14, b: 10 } });
     this._p3tpl.onClick = act(this._p3tpl);
     this._p3thumbs = SCENES.map((s, i) => { const pv = this.$('scenes').children[i].querySelector('.pv');
-      const v = E.view(this._p3canvas(pv), { safe: { l: 2, t: 2, r: 2, b: 2 }, res: 1.5, labels: false, state: () => this._p3state(s.id) }); v.frame(...s.f); return v; });
+      const v = E.view(this._p3canvas(pv), { safe: { l: 2, t: 2, r: 2, b: 2 }, res: 1, labels: false, state: () => this._p3state(s.id) }); v.frame(...s.f); return v; });
     this._p3plan.frame(...this._frame('plan'));
+    if (this._mob) this._safeFor(true);
     this._p3tpl.frame(...this._frame('r:templo'));
     // pinos da planta: rótulos dos blocos e uma bolinha por luminária
     const pp = this.$('plan-pv'); pp.querySelectorAll('.pin').forEach((p) => p.remove()); this._planDots = [];
@@ -1032,7 +1090,8 @@ class IgrejaPainelCard extends HTMLElement {
   _go(nav) {
     if (nav === 'alexa' && !(this._config || {}).alexa_device) return;
     this._popClose(); this._nav = nav; const app = this.$('app');
-    app.className = 'p-' + nav;
+    app.className = 'p-' + nav + (this._mob ? ' m' : '');
+    if (this._mob) app.scrollTop = 0;   // celular: cada aba começa do topo
     this.shadowRoot.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
     if (nav === 'rooms') { this._ambScroll = true; this._placeAmb(); }
     if (nav === 'alexa') this._alexaLoad();

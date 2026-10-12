@@ -45,7 +45,9 @@ Demo com Home Assistant simulado: `painel.html` (abrir por HTTP, por exemplo `py
        # alexa_device: <id do Echo>   # mostra o menu Alexa
    ```
 
-Opções: `entities`, `title`, `height`, `vista_3d: false` (sem 3D, planta 2D), `luz_3d: noite|dia`, `night_vision`,
+**Celular** (v1.3.0): em tela estreita (< 700 px) ou baixa (< 520 px) o painel vira uma coluna com rolagem, abas embaixo, seletores e janelas que sobem de baixo, e o 3D com resolução menor; dá para rolar a página por cima do 3D (arrastar na horizontal gira). `layout: celular | painel` força um dos dois.
+
+Opções: `layout`, `entities`, `title`, `height`, `vista_3d: false` (sem 3D, planta 2D), `luz_3d: noite|dia`, `night_vision`,
 `quality` (como no igreja3d-card), `toque: false` (vistas só de olhar), `corte_comodo: false`, `alexa_device`
 (com `alexa_fala`, `alexa_anuncio`, `alexa_nao_incomodar` opcionais).
 

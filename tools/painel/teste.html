@@ -36,6 +36,7 @@ function apply(d, s, x) {
   card.hass = mk();
 }
 window.__card = card; window.__apply = apply;
+window.__setState = (id, st, at) => { states[id] = { entity_id: id, state: st, attributes: Object.assign({}, (states[id] || {}).attributes, at || {}) }; card.hass = mk(); };
 const p = new URLSearchParams(location.search);
 await import(p.get('card') || './igreja-painel-card.js');
 card = document.createElement('igreja-painel-card'); window.__card = card;

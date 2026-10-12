@@ -6,10 +6,11 @@ Não edite o `igreja-painel-3d.js` à mão; rode o build de novo quando o cartã
 
 ## API (contrato do PLANO.md)
 ```js
-import { VERSION, ROOMS3D, BLOCKS3D, PLAN3D, IgrejaPainel3D } from './igreja-painel-3d.js?v=1.0.0';
+import { VERSION, ROOMS3D, BLOCKS3D, PLAN3D, IgrejaPainel3D } from './igreja-painel-3d.js?v=1.1.0';
 const E = IgrejaPainel3D.shared({ night_vision: true, quality: 'auto' });   // window.__igrejaPainel3D; quality: auto|alta|media|leve|min
 await E.ready();
 const v = E.view(canvas, { interactive: true, safe: { l, t, r, b }, home: [giro, incl], state: () => estado, res: 1 });
+const m = E.view(canvas2, { preview: true, state: () => estadoDaCena });   // v1.1.0: miniatura parada (veja Redesenho)
 v.frame(...ROOMS3D.midia); v.cut('midia');            // corte só no cômodo (ou bloco: v.cut('templo')); v.cut(null) volta
 v.onClick((px, py, hit) => …);                        // hit = pickAt(px, py); também aceita v.onClick = fn
 v.onCam((v) => …);                                    // girou/aproximou (para reposicionar pinos com v.project)
@@ -22,6 +23,21 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - `estado` = `{ lights:{chave:bool}, palco:{on, rgb:[r,g,b], bri 0–100}, plateia:{on, bri}, telao:{on, title}, som:bool,
   ac:{chave:{on, mode:'cool'|'heat'|…}}, porta:bool, night:bool }`.
 - Paredes entre a câmera e o retângulo enquadrado são cortadas a 0,9 m (com a decoração fina presa nelas); `view(…, { cuts: false })` desliga.
+
+## Redesenho (v1.1.0)
+- **Cada vista só redesenha quando algo que muda a imagem dela muda**: tamanho em px, câmera (giro, inclinação, zoom/distância,
+  alvo, área livre/deslocamento), retângulo enquadrado, corte (`cut`), `cuts`, `preview`, o `state()` e uma época global.
+  `render()` sem mudança custa só essa comparação (contadores `v.drawn` e `v.skipped`); um `hass` que não mexe na igreja não desenha nada.
+- **A/C**: o relógio dos ares redesenha só as vistas ao vivo em que aparece uma unidade que anda (frustum da câmera com 3,2 m em
+  volta da unidade, recorte do cômodo); quando o ar para, nada mais redesenha.
+- **`preview: true`** (opcional, padrão `false`; uma vista não interativa sem ele continua animando, como a mini do `motor.html`):
+  miniatura de uma cena. Desenha o estado dela com cada unidade de A/C direto no estado final (sem o ligar animado nem a aleta
+  oscilando) e depois devolve à cena o estado ao vivo (integradores e sequência dos ares, porta), sem refazer as sombras da
+  porta; dia/noite vale (sombra da lua certa). O relógio dos ares nunca redesenha uma miniatura. Antes, a troca miniatura ↔ vista ao
+  vivo (Culto/Ensaio com o ar ligado, Chegada com a porta aberta) reiniciava o ligar do ar a cada desenho e tudo redesenhava sem parar.
+- `E.invalidate()` redesenha todas as vistas (para quem mexe na cena por fora do `state()`). Voltar à aba, canvas 2D descartado pelo
+  navegador (`contextrestored`) e contexto WebGL restaurado redesenham sozinhos.
+- Desligar a comparação: `IgrejaPainel3D.shared({ liveSig: false })` (ou `window.__NOSKIP = true` nos testes).
 
 ## Teste
 `THREE_LOCAL=…/three.module.min.js <python com playwright> painel/teste/test_motor.py <pasta-dos-pngs>` (Chrome instalado, sem Node).
@@ -55,4 +71,5 @@ v.onCam((v) => …);                                    // girou/aproximou (para
   (~0,4 s), não reinicia o ligar, e o ar anda ~8 s para mostrar a velocidade nova. A velocidade é por entidade (a da 1ª unidade ligada).
 - `swing` ≠ off (on/vertical/horizontal/both) com a unidade ligada → a aleta oscila devagar (~5 s por vaivém, ~35°–69°), por unidade.
   Com off, ela fica aberta na posição normal (0,9 rad). O relógio roda a ≤ 20 q/s e só enquanto uma unidade oscilando aparece
-  em alguma vista (frustum, corte no cômodo, canvas na página, aba visível); com prefers-reduced-motion fica parada.
+  em alguma vista ao vivo (frustum, corte no cômodo, canvas na página e com tamanho, aba visível; miniatura não conta), redesenhando
+  só as vistas em que ela aparece; com prefers-reduced-motion fica parada.

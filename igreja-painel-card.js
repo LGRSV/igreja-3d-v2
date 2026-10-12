@@ -6,8 +6,8 @@
  * sem o motor fica uma planta 2D desenhada aqui mesmo (mesma API de vista).
  * Entidades e blocos = os do igreja3d-card v1.8 (templo · operacional · banheiro · pastoral · hall).
  */
-const IGP_VERSION = '1.3.0'; // v1.3.0: layout de celular (coluna com rolagem, abas embaixo, seletores e janelas de baixo para cima, 3D com resolução menor e rolagem por cima); miniaturas mais leves · v1.2.0: v1.2.0: em cada A/C o botão ⏻, Velocidade (fan_modes) e Aleta (swing_modes) com seletor; modo do split também no seletor · v1.1.0: v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
-const P3_URL = new URL('igreja-painel-3d.js?v=1.0.1', import.meta.url).href;
+const IGP_VERSION = '1.3.1'; // v1.3.1: miniaturas das cenas paradas (preview do motor v1.1.0, que só redesenha uma vista quando algo nela muda) · v1.3.0: layout de celular (coluna com rolagem, abas embaixo, seletores e janelas de baixo para cima, 3D com resolução menor e rolagem por cima); miniaturas mais leves · v1.2.0: v1.2.0: em cada A/C o botão ⏻, Velocidade (fan_modes) e Aleta (swing_modes) com seletor; modo do split também no seletor · v1.1.0: v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
+const P3_URL = new URL('igreja-painel-3d.js?v=1.1.0', import.meta.url).href;
 
 // ---------- entidades (iguais ao README do igreja3d-card, "Configuração completa") ----------
 const ENT = {
@@ -748,7 +748,7 @@ class IgrejaPainelCard extends HTMLElement {
     this._p3tpl = mk('tpl-pv', { interactive: true, safe: { l: 14, t: 70, r: 14, b: 10 } });
     this._p3tpl.onClick = act(this._p3tpl);
     this._p3thumbs = SCENES.map((s, i) => { const pv = this.$('scenes').children[i].querySelector('.pv');
-      const v = E.view(this._p3canvas(pv), { safe: { l: 2, t: 2, r: 2, b: 2 }, res: 1, labels: false, state: () => this._p3state(s.id) }); v.frame(...s.f); return v; });
+      const v = E.view(this._p3canvas(pv), { preview: true, safe: { l: 2, t: 2, r: 2, b: 2 }, res: 1, labels: false, state: () => this._p3state(s.id) }); v.frame(...s.f); return v; });   // preview: estado da cena parado (não mexe no ar ao vivo)
     this._p3plan.frame(...this._frame('plan'));
     if (this._mob) this._safeFor(true);
     this._p3tpl.frame(...this._frame('r:templo'));
@@ -768,7 +768,7 @@ class IgrejaPainelCard extends HTMLElement {
       plateia: { on: !!on.plateia, bri: sid ? ({ culto: 60, ensaio: 25 }[sid] || 100) : S.plateiaBri || 100 },
       telao: { on: !!on.telao, title: sid ? '' : (S.telao && S.telao.title) || '' },
       som: !!on.som,
-      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null), fan: S.ac[k] ? S.ac[k].fan : null, swing: S.ac[k] ? S.ac[k].swing : null }])),
+      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null), fan: S.ac[k] ? S.ac[k].fan : null, swing: !sid && S.ac[k] ? S.ac[k].swing : null }])),   // miniatura não oscila: sem swing (não redesenha à toa)
       porta: sid ? sid === 'chegada' : !!S.porta,
       night: sid ? true : S.night !== false,
     };

@@ -32,8 +32,8 @@ const AC_ROOM = { ac_templo: 'Templo · 5 splits', ac_pastoral: 'Sala Pastoral',
 const BLOCKS = [
   { id: 'templo', n: 'Templo', icon: 'church', rooms: ['templo'], box: [0, 12.4, 16.05, 44.0], lp: [10.8, 28.1] },
   { id: 'operacional', n: 'Operacional', icon: 'desk', rooms: ['gilvan', 'administrativo', 'circulacao', 'midia', 'voluntariado'], box: [16.05, 11.0, 20.1, 33.9], lp: [18.1, 22.4] },
-  { id: 'banheiro', n: 'Banheiro', icon: 'drop', rooms: ['deposito', 'wc_masc', 'hall_banheiros', 'wc_fem'], box: [16.05, 33.9, 20.1, 49.5], lp: [18.6, 44.0] },
-  { id: 'pastoral', n: 'Sala Pastoral', icon: 'book', rooms: ['patio', 'almoxarifado', 'cozinha', 'recepcao', 'pastoral'], box: [0, 0, 20.1, 12.4], lp: [10.0, 6.2] },
+  { id: 'banheiro', n: 'Banheiro', icon: 'drop', rooms: ['deposito', 'tecnica', 'wc_masc', 'hall_banheiros', 'wc_fem'], box: [16.05, 33.9, 20.1, 49.5], lp: [18.6, 44.0] },
+  { id: 'pastoral', n: 'Sala Pastoral', icon: 'book', rooms: ['patio', 'almoxarifado', 'cozinha', 'recepcao', 'pastoral', 'caixa_dagua'], box: [0, 0, 20.1, 12.4], lp: [10.0, 6.2] },
   { id: 'hall', n: 'Hall de entrada', icon: 'door', rooms: ['hall', 'wcs', 'estac_frontal', 'fachada'], box: [-3, 44.0, 23, 60], lp: [10.0, 47.0] },
 ];
 const ROOMS = [
@@ -44,6 +44,7 @@ const ROOMS = [
   { id: 'midia', n: 'Mídia', b: 'operacional', box: [16.05, 23.3, 18.9, 28.0], items: ['midia', 'ac_midia'] },
   { id: 'voluntariado', n: 'Voluntariado', b: 'operacional', box: [16.05, 28.0, 20.1, 33.9], items: ['voluntariado', 'ac_voluntariado'] },
   { id: 'deposito', n: 'Depósito', b: 'banheiro', box: [17.1, 33.9, 20.1, 35.9], items: ['banheiros'] },
+  { id: 'tecnica', n: 'Área técnica', b: 'banheiro', box: [17.1, 35.9, 20.1, 37.0], items: [] },
   { id: 'wc_masc', n: 'WC Masc.', b: 'banheiro', box: [17.1, 37.0, 20.1, 40.8], items: ['banheiros'] },
   { id: 'hall_banheiros', n: 'Hall dos banheiros', b: 'banheiro', box: [16.05, 40.8, 20.1, 44.3], items: ['banheiros'] },
   { id: 'wc_fem', n: 'WC Fem.', b: 'banheiro', box: [16.05, 44.3, 20.1, 49.5], items: ['banheiros'] },
@@ -52,6 +53,7 @@ const ROOMS = [
   { id: 'cozinha', n: 'Cozinha', b: 'pastoral', box: [8.6, 0, 12.75, 3.9], items: ['cozinha'] },
   { id: 'recepcao', n: 'Recepção', b: 'pastoral', box: [9.45, 5.9, 12.75, 9.25], items: ['recepcao'] },
   { id: 'pastoral', n: 'Sala Pastoral', b: 'pastoral', box: [12.75, 0, 20.1, 11.0], items: ['pastoral', 'ac_pastoral'] },
+  { id: 'caixa_dagua', n: 'Caixa d’água', b: 'pastoral', box: [17.0, 0, 20.1, 3.1], items: [] },
   { id: 'hall', n: 'Hall', b: 'hall', box: [0, 44.0, 16.05, 49.65], items: ['hall', 'porta'] },
   { id: 'wcs', n: 'WCs da frente', b: 'hall', box: [0, 44.0, 4.0, 46.3], items: ['banheiros'] },
   { id: 'fachada', n: 'Fachada', b: 'hall', box: [-3, 49.65, 23, 51.0], items: ['fachada'] },
@@ -478,8 +480,8 @@ class FlatView {
       if (w > 46 && h > 16 && this.o.labels !== false) { g.fillStyle = 'rgba(223,238,240,.75)'; g.font = '600 10px Inter,Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(r.n, a + w / 2, b + h / 2, w - 6); }
     }
     g.globalAlpha = 1;
-    if (st.palco && st.palco.on) { const [a, b, w, h] = rect([0, 12.4, 16.05, 15.4]); g.fillStyle = hex(st.palco.rgb || [255, 180, 110]) + 'aa'; g.fillRect(a, b, w, h); }
-    if (st.telao && st.telao.on) { const [a, b, w, h] = rect([4.5, 12.5, 11.5, 13.0]); g.fillStyle = '#7fd8ff'; g.fillRect(a, b, Math.max(w, 2), Math.max(h, 2)); }
+    if (st.palco && st.palco.on) { const [a, b, w, h] = rect([0, 20.0, 4.9, 36.2]); g.fillStyle = hex(st.palco.rgb || [255, 180, 110]) + 'aa'; g.fillRect(a, b, w, h); }
+    if (st.telao && st.telao.on) { const [a, b, w, h] = rect([0.1, 24.6, 0.6, 31.6]); g.fillStyle = '#7fd8ff'; g.fillRect(a, b, Math.max(w, 2), Math.max(h, 2)); }
     for (const k of ACS) { const on = st.ac && st.ac[k] && st.ac[k].on; for (const w of this.e.points(k)) { const [a, b] = this.project(w); g.beginPath(); g.arc(a, b, 4, 0, 7); g.fillStyle = on ? '#5ab8ff' : '#33515a'; g.fill(); } }
   }
 }
@@ -491,7 +493,7 @@ class FlatEngine {
   roomAt(x, z) { const hit = ROOMS.filter((r) => x >= r.box[0] && x <= r.box[2] && z >= r.box[1] && z <= r.box[3]);
     hit.sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1])); return hit.length ? hit[0].id : null; }
   points(k) {   // centro do cômodo de cada luz/aparelho (o palco fica na frente do templo)
-    if (k === 'palco') return [[8.0, 3.2, 13.9]]; if (k === 'telao') return [[8.0, 3.0, 12.7]]; if (k === 'som') return [[1.5, 1.0, 13.5], [14.5, 1.0, 13.5]];
+    if (k === 'palco') return [[2.6, 3.2, 28.1]]; if (k === 'telao') return [[0.25, 2.65, 28.1]]; if (k === 'som') return [[4.9, 1.065, 19.8], [4.9, 1.065, 36.4]];
     const rs = ROOMS.filter((r) => r.items[0] === k || (k.startsWith('ac_') && r.items.includes(k)) || (LIGHTS.includes(k) && r.items.includes(k) && r.items.indexOf(k) === 0));
     return rs.map((r) => [(r.box[0] + r.box[2]) / 2 + (k.startsWith('ac_') ? (r.box[2] - r.box[0]) * 0.3 : 0), 2.6, (r.box[1] + r.box[3]) / 2]);
   }

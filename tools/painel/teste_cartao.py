@@ -68,12 +68,12 @@ def run(mode):
         # toque na planta seleciona o cômodo da mídia
         xy = E("(()=>{const v=window.__card._p3plan,[a,b]=v.project([17.5,0,25.6]),r=v.cv?v.cv.getBoundingClientRect():null;return [a,b]})()")
         cv = pg.locator('igreja-painel-card').locator('#plan-pv canvas.p3')
-        if mode == 'flat' or MOTOR.name == 'igreja-painel-3d.stub.js':
+        if True:
             cv.click(position={'x': xy[0], 'y': xy[1]}); pg.wait_for_timeout(200)
             ok(E(f"{R}.getElementById('room-name').textContent") == 'Mídia', f'[{mode}] toque na planta abre Mídia ({E(R + ".getElementById(\'room-name\').textContent")})')
-            if mode == 'motor': ok(E("window.__stubLog.some(x=>x[0]==='cut'&&x[1]==='room-pv'&&x[2]==='midia')"), f'[{mode}] corte só no cômodo')
+            if mode == 'motor' and MOTOR.name.endswith('stub.js'): ok(E("window.__stubLog.some(x=>x[0]==='cut'&&x[1]==='room-pv'&&x[2]==='midia')"), f'[{mode}] corte só no cômodo')
         # toque num aparelho na vista do cômodo liga/desliga
-        if mode == 'flat' or MOTOR.name == 'igreja-painel-3d.stub.js':
+        if True:
             xy = E("window.__card._p3room.project(window.__card._p3.points('midia')[0])"); E("window.__calls.length=0")
             pg.locator('igreja-painel-card').locator('#room-pv canvas.p3').click(position={'x': xy[0], 'y': xy[1]})
             ok(E("window.__calls.some(c=>c[2].entity_id==='light.sala_midia')"), f'[{mode}] toque na luz da mídia na vista 3D')

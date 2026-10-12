@@ -14,7 +14,7 @@ JS = r"""(() => {
       const [x, y] = v.project(p); if (x < 2 || y < 2 || x > w - 2 || y > h - 2) continue;
       res.vistos++;
       const g = v.pickAt(x, y);
-      if (g && g.key === k) res.ok++; else res.falhas.push([id, k, p.map(n => +n.toFixed(2)), g && [g.kind, g.key]]);
+      if (g && (g.key === k || (g.key || '').startsWith(k + '_'))) res.ok++; else res.falhas.push([id, k, p.map(n => +n.toFixed(2)), g && [g.kind, g.key]]);
     }
   }
   v.frame(...m.ROOMS3D.midia); v.cut('midia');

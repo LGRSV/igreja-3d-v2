@@ -31,6 +31,10 @@ function p3RoomAt(x, z) {
   return null;
 }
 const P3_KIND = { light: 'light', climate: 'ac', media: 'telao', switch: 'som' };
+// v1.1: splits do templo controláveis um a um — 'ac_templo_1' … 'ac_templo_5', numerados da esquerda para a direita de quem está no palco
+// olhando a plateia (+x): a esquerda é z menor. Cada chave individual no estado manda na sua unidade; sem ela vale 'ac_templo'.
+const P3_UNITS = { ac_templo: 5 };
+const p3Unit = (k) => { const m = /^(ac_[a-z]+)_(\d)$/.exec(k || ''); return m && P3_UNITS[m[1]] && +m[2] >= 1 && +m[2] <= P3_UNITS[m[1]] ? { base: m[1], n: +m[2] } : null; };
 
 class P3View {
   constructor(E, canvas, o = {}) {
@@ -179,6 +183,8 @@ export class IgrejaPainel3D {
   drop(v) { this.views.delete(v); this._dirty.delete(v); }
   // posições [x, y, z] das luminárias/aparelhos de uma entidade (para os pinos)
   points(key) {
+    const un = p3Unit(key);
+    if (un) { const rt = this.host && this.host._items.get(un.base), i = this._unitIdx(un.base, un.n); return rt && rt.airUnits && i != null ? [[rt.airUnits[i].p.x, rt.airUnits[i].p.y, rt.airUnits[i].p.z]] : []; }
     const it = ITEMS.find((x) => x.key === key); if (!it) return [];
     if (it.fixtures) return it.fixtures.filter((f) => !f.hidden && !f.ext).map((f) => [f.p[0], f.p[1], f.p[2]]);
     const rt = this.host && this.host._items.get(key);
@@ -197,7 +203,7 @@ export class IgrejaPainel3D {
     H0._config = Object.assign({}, DEFAULT_CONFIG, { entities: opts.entities || {}, entorno: true });
     let q = H0._qualityFor(opts.quality || 'auto');
     H0._q = q; H0._lite = q === 'leve' || q === 'min'; H0._min = q === 'min';
-    H0._nightVision = opts.night_vision !== false; H0._reduced = true; H0._state = {}; H0._lastChanged = {}; H0._activity = [];
+    H0._nightVision = opts.night_vision !== false; H0._reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; H0._state = {}; H0._lastChanged = {}; H0._activity = [];
     H0._items = new Map(); H0._clickables = []; H0._labels = []; H0._zoneMeshes = {}; H0._nLights = 0; H0._nShadows = 0; H0._topView = false;
     const M = materials();
     const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
@@ -504,11 +510,11 @@ export class IgrejaPainel3D {
       if (v._cutRoom && ROOMS3D[v._cutRoom] && room !== v._cutRoom) room = v._cutRoom;   // corte no cômodo: o que sobra é dele
       if (key && !zone) {
         const itm = ITEMS.find((x) => x.key === key), kind = itm && P3_KIND[itm.kind];
-        if (kind) return { kind, key, room, point: [p.x, p.y, p.z] };
+        if (kind) return { kind, key: this._unitKey(key, p), room, point: [p.x, p.y, p.z] };
       }
       // carcaça/suporte de um aparelho (moving head, campânula, corpo do split…): o aparelho mais próximo a até 0,45 m
       const near = this._nearItem(p);
-      if (near) { const itm = ITEMS.find((x) => x.key === near); return { kind: P3_KIND[itm.kind], key: near, room: room || p3RoomAt(p.x, p.z), point: [p.x, p.y, p.z] }; }
+      if (near) { const itm = ITEMS.find((x) => x.key === near); return { kind: P3_KIND[itm.kind], key: this._unitKey(near, p), room: room || p3RoomAt(p.x, p.z), point: [p.x, p.y, p.z] }; }
       if (!room) return null;
       return { kind: 'room', key: zone ? (ZONES[zone] && ZONES[zone].item) || null : key, room, point: [p.x, p.y, p.z] };
     }
@@ -517,6 +523,18 @@ export class IgrejaPainel3D {
     return room ? { kind: 'room', key: null, room, point: [g[0], 0, g[1]] } : null;
   }
 
+  _unitIdx(base, n) {
+    const rt = this.host && this.host._items.get(base); if (!rt || !rt.airUnits) return null;
+    const ord = rt.airUnits.map((u, i) => i).sort((a, b) => (rt.airUnits[a].p.z - rt.airUnits[b].p.z) || (rt.airUnits[a].p.x - rt.airUnits[b].p.x));
+    return ord[n - 1] != null ? ord[n - 1] : null;
+  }
+  // aparelho do templo tocado → a unidade mais próxima do ponto ('ac_templo_N')
+  _unitKey(key, p) {
+    if (!P3_UNITS[key]) return key;
+    let best = 1, bd = 1e9;
+    for (let n = 1; n <= P3_UNITS[key]; n++) { const q = this.points(key + '_' + n)[0]; if (!q) continue; const d = Math.hypot(p.x - q[0], p.y - q[1], p.z - q[2]); if (d < bd) { bd = d; best = n; } }
+    return key + '_' + best;
+  }
   _nearItem(p) {
     if (!this._itemPts) { this._itemPts = []; for (const it of ITEMS) if (P3_KIND[it.kind]) for (const q of this.points(it.key)) this._itemPts.push([it.key, q]); }
     let best = null, bd = 0.45;
@@ -548,7 +566,7 @@ export class IgrejaPainel3D {
       else if (it.kind === 'light') s = L[it.key] ? 'on' : 'off';
       else if (it.key === 'telao') { const tv = st.telao || {}; s = tv.on ? (tv.title ? 'playing' : 'on') : 'off'; if (tv.title) a.media_title = tv.title; }
       else if (it.key === 'som') s = st.som ? 'on' : 'off';
-      else if (it.kind === 'climate') { const ac = (st.ac || {})[it.key]; s = ac && ac.on ? (ac.mode || 'cool') : 'off'; }
+      else if (it.kind === 'climate') { const w = this._acWants(st, it.key); s = w.some((u) => u.on) ? (w.find((u) => u.on).mode || 'cool') : 'off'; }
       else if (it.key === 'porta') s = st.porta ? 'on' : 'off';
       else continue;
       H0._setItemState(it.key, { state: s, attrs: a });
@@ -588,16 +606,60 @@ export class IgrejaPainel3D {
         if (rt.bloom) { rt.bloom.material.opacity = pulse * lv * 0.35 * Lr(0.4, 1, nl); rt.bloom.visible = lv > 0.01; }
       }
       if (it.key === 'som' && rt.ledMats) for (const m of rt.ledMats) m.emissiveIntensity = lv * 2.6;
-      if (it.kind === 'climate' && rt.ledMats) {
-        const hv = rt.hvacOn || rt.hvac, c = hv === 'cool' ? 0x67d3ff : hv === 'heat' ? 0xff8a5b : 0x8ef0b0;
-        rt.snap = true; H0._airStep(rt, c, now, 0, nl, it.key);
-      }
+      if (it.kind === 'climate' && rt.ledMats) this._acApply(st, it.key, rt, nl, now);
       if (it.key === 'porta' && rt.leaves) {
         for (const lf of rt.leaves) { const ry = lf.base - lf.dir * lv * 1.25; if (lf.g.rotation.y !== ry) { lf.g.rotation.y = ry; H0._refreshPointShadows('hall'); H0._sun.shadow.needsUpdate = true; } }
       }
     }
     this._dayScale = dayScale;
     if (H0._needShadow) { this.renderer.shadowMap.needsUpdate = true; H0._needShadow = false; }
+  }
+
+  // ligado/modo de cada unidade do ar: chave individual (ac_templo_N) manda na unidade; senão vale a da entidade
+  _acWants(st, key) {
+    const ac = st.ac || {}, rt = this.host._items.get(key), n = rt && rt.airUnits ? rt.airUnits.length : 1, all = ac[key] || {};
+    const out = Array.from({ length: n }, () => ({ on: !!all.on, mode: all.mode }));
+    if (P3_UNITS[key]) for (let k = 1; k <= P3_UNITS[key]; k++) { const u = ac[key + '_' + k], i = this._unitIdx(key, k); if (u && i != null) out[i] = { on: !!u.on, mode: u.mode || all.mode }; }
+    return out;
+  }
+  // Ar → unidades. Na 1ª vez (carga) fica como está, sem animar. Depois, unidade que liga entra na sua vez (como o _airStart do
+  // cartão: 0,6 s + 2,5 s por unidade no templo; 0,4 s com uma só) e a que desliga fecha — tudo pelo _airStep do cartão, via rt.seq.
+  _acApply(st, key, rt, nl, now) {
+    const H0 = this.host, w = this._acWants(st, key).map((u) => u.on), hv = rt.hvacOn || rt.hvac;
+    const col = hv === 'cool' ? 0x67d3ff : hv === 'heat' ? 0xff8a5b : 0x8ef0b0;
+    this._acPrev = this._acPrev || new Map(); this._airCol = this._airCol || new Map(); this._airCol.set(key, col); this._nl = nl;
+    const prev = this._acPrev.get(key); this._acPrev.set(key, w);
+    rt.on = w.some(Boolean);
+    if (!prev) { rt.seq = { t0: now, off: w.map((on) => (on ? -1e9 : Infinity)) }; rt.snap = true; H0._airStep(rt, col, now, 0, nl, key); return; }
+    if (prev.length === w.length && prev.every((x, i) => x === w[i])) { H0._airStep(rt, col, now, 0, nl, key); return; }
+    const lead = H0._reduced ? 0 : 600, stag = H0._reduced ? 0 : 2500;
+    const fresh = (rt.airOrder || w.map((_, i) => i)).filter((i) => w[i] && !prev[i]), many = fresh.length > 1;
+    const off = w.map((on, i) => (!on ? Infinity : fresh.includes(i) ? (many ? lead + fresh.indexOf(i) * stag : (H0._reduced ? 0 : 400)) : -1e9));
+    rt.seq = { t0: now, off };
+    const end = Math.max(0, ...off.filter((x) => x > -1e8 && x < Infinity));
+    rt.airUntil = Math.max(rt.airUntil || 0, now + end + 2600 + 8000);
+    (this._airAnim = this._airAnim || new Set()).add(key);
+    this._airLoop();
+  }
+  // relógio da animação dos ares (~25 q/s): avança o _airStep do cartão, faz o ar andar e redesenha as vistas até assentar
+  _airLoop() {
+    if (this._airRaf || !this._airAnim || !this._airAnim.size) return;
+    const H0 = this.host;
+    const step = () => {
+      const now = performance.now();
+      if (now - (this._airLast || 0) >= 40) {
+        const dt = Math.min((now - (this._airLast || now)) / 1000, 0.1); this._airLast = now;
+        for (const key of [...this._airAnim]) {
+          const rt = H0._items.get(key); if (!rt) { this._airAnim.delete(key); continue; }
+          const busy = H0._airStep(rt, this._airCol.get(key), now, dt, this._nl == null ? 1 : this._nl, key);
+          const t = (now / 1000) % 1000; if (rt.airMesh) rt.airMesh.material.uniforms.uT.value = t; if (rt.airPts) rt.airPts.material.uniforms.uT.value = t;
+          if (!busy && now > (rt.airUntil || 0)) this._airAnim.delete(key);
+        }
+        this.views.forEach((v) => v.render());
+      }
+      if (this._airAnim.size) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
+    };
+    this._airRaf = requestAnimationFrame(step);
   }
 
   // estado da vista (luzes, mezanino, luz que segue o cômodo, conjunto de luzes do media) e cortes

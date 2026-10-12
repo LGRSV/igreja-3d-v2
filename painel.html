@@ -17,7 +17,8 @@ try {
   const el = document.createElement(tag); el.style.cssText = 'display:block;height:100%';
   const host = document.getElementById('host'); host.replaceChildren(el);
   const { attach } = await import('./painel/demo-hass.js?v=' + v);
-  attach(el, { type: 'custom:' + tag, title: 'Base Church', height: '100vh' });
+  attach(el, { type: 'custom:' + tag, title: 'Base Church', height: '100vh',
+    entities: { ac_templo_1: 'climate.ar_templo_1', ac_templo_2: 'climate.ar_templo_2', ac_templo_3: 'climate.ar_templo_3', ac_templo_4: 'climate.ar_templo_4', ac_templo_5: 'climate.ar_templo_5' } });
   window.__card = el; window.__tag = tag;
 } catch (e) { erro('Falha ao carregar o cartão: ' + (e && e.message || e)); }
 window.__pronto = true;

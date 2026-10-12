@@ -8,6 +8,12 @@ mk('light.templo_plateia', 'on', { friendly_name: 'Plateia', brightness: 77, sup
 mk('media_player.telao_led', 'playing', { friendly_name: 'Telão LED', media_title: 'Louvor — Base Music', volume_level: 0.6 }, 6);
 mk('switch.som_templo', 'on', { friendly_name: 'Som do templo' }, 40);
 mk('climate.ar_templo', 'cool', { friendly_name: 'Ar do templo', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'], swing_mode: 'on', swing_modes: ['off', 'on'] }, 55);
+// os 5 splits do templo (entities ac_templo_1…5 do painel): 2 ligados e 3 desligados
+mk('climate.ar_templo_1', 'cool', { friendly_name: 'A/C do templo · split 1', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
+mk('climate.ar_templo_2', 'cool', { friendly_name: 'A/C do templo · split 2', temperature: 22, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
+mk('climate.ar_templo_3', 'off', { friendly_name: 'A/C do templo · split 3', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
+mk('climate.ar_templo_4', 'off', { friendly_name: 'A/C do templo · split 4', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
+mk('climate.ar_templo_5', 'off', { friendly_name: 'A/C do templo · split 5', temperature: 23, current_temperature: 24.5, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'fan_only', 'dry', 'heat_cool'] }, 55);
 mk('light.hall_entrada', 'on', { friendly_name: 'Hall de entrada' }, 70);
 mk('light.fachada_letreiro', 'on', { friendly_name: 'Fachada / letreiro' }, 95);
 mk('light.estacionamento', 'on', { friendly_name: 'Estacionamento' }, 95);

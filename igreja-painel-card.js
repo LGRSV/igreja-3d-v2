@@ -6,7 +6,7 @@
  * sem o motor fica uma planta 2D desenhada aqui mesmo (mesma API de vista).
  * Entidades e blocos = os do igreja3d-card v1.8 (templo · operacional · banheiro · pastoral · hall).
  */
-const IGP_VERSION = '1.0.0'; // v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, Ares, Alexa
+const IGP_VERSION = '1.1.0'; // v1.1.0: “A/C” no lugar de “Ar”; A/C do Templo com Ligar/Desligar todos e os 5 splits separados (ac_templo_1…5) · v1.0.0: primeira versão — Início (resumo, cenas, blocos, ambiente 3D clicável, planta), Ambientes, Templo/Culto, A/C, Alexa
 const P3_URL = new URL('igreja-painel-3d.js?v=1.0.1', import.meta.url).href;
 
 // ---------- entidades (iguais ao README do igreja3d-card, "Configuração completa") ----------
@@ -20,12 +20,14 @@ const ENT = {
 };
 const LIGHTS = ['palco', 'plateia', 'hall', 'fachada', 'estacionamento', 'banheiros', 'pastoral', 'recepcao', 'administrativo', 'circulacao', 'midia', 'voluntariado', 'cozinha'];
 const ACS = ['ac_templo', 'ac_pastoral', 'ac_midia', 'ac_voluntariado'];
-const TOG = [...LIGHTS, 'som', 'telao', ...ACS];   // tudo que liga e desliga
+const SPLITS = ['ac_templo_1', 'ac_templo_2', 'ac_templo_3', 'ac_templo_4', 'ac_templo_5'];   // os 5 splits do templo (opcionais: entities.ac_templo_1…5)
+const TOG = [...LIGHTS, 'som', 'telao', ...ACS, ...SPLITS];   // tudo que liga e desliga
 const SENS = ['presenca', 'temperatura', 'porta'];
 const NAMES = { palco: 'Palco', plateia: 'Plateia', hall: 'Hall', fachada: 'Fachada', estacionamento: 'Estacionamento', banheiros: 'Banheiros',
   pastoral: 'Sala Pastoral', recepcao: 'Recepção', administrativo: 'Administrativo', circulacao: 'Circulação', midia: 'Mídia', voluntariado: 'Voluntariado',
-  cozinha: 'Cozinha', som: 'Som', telao: 'Telão', ac_templo: 'Ar do Templo', ac_pastoral: 'Ar da Pastoral', ac_midia: 'Ar da Mídia',
-  ac_voluntariado: 'Ar do Voluntariado', presenca: 'Presença', temperatura: 'Temperatura', porta: 'Porta principal' };
+  cozinha: 'Cozinha', som: 'Som', telao: 'Telão', ac_templo: 'A/C do Templo', ac_pastoral: 'A/C da Pastoral', ac_midia: 'A/C da Mídia',
+  ac_voluntariado: 'A/C do Voluntariado', ac_templo_1: 'Split 1', ac_templo_2: 'Split 2', ac_templo_3: 'Split 3', ac_templo_4: 'Split 4', ac_templo_5: 'Split 5', presenca: 'Presença', temperatura: 'Temperatura', porta: 'Porta principal' };
+const AC_SHORT = { ac_templo: 'Templo', ac_pastoral: 'Pastoral', ac_midia: 'Mídia', ac_voluntariado: 'Voluntariado' };
 const AC_ROOM = { ac_templo: 'Templo · 5 splits', ac_pastoral: 'Sala Pastoral', ac_midia: 'Sala de Mídia', ac_voluntariado: 'Voluntariado' };
 
 // ---------- blocos e cômodos (v1.8 do igreja3d-card); box = [x0, z0, x1, z1] em metros ----------
@@ -67,11 +69,11 @@ const frameOf = (box) => [...box, 90, 52];
 
 // ---------- cenas ----------
 const SCENES = [
-  { id: 'culto', n: 'Culto', d: 'Palco, telão, som e ar', icon: 'church', f: [0, 12.4, 16.05, 44.0, 90, 46] },
+  { id: 'culto', n: 'Culto', d: 'Palco, telão, som e A/C', icon: 'church', f: [0, 12.4, 16.05, 44.0, 90, 46] },
   { id: 'ensaio', n: 'Ensaio', d: 'Palco azul, plateia baixa', icon: 'music', f: [0, 12.4, 16.05, 26.0, 90, 46] },
   { id: 'chegada', n: 'Chegada', d: 'Hall, fachada e pátio', icon: 'door', f: [-3, 40.0, 23, 60, 90, 48] },
   { id: 'limpeza', n: 'Limpeza', d: 'Todas as luzes no máximo', icon: 'sun', f: [-3, 0, 23, 60, 90, 58] },
-  { id: 'fechar', n: 'Fechar tudo', d: 'Apaga luzes, ares e som', icon: 'power', f: [-3, 0, 23, 60, 90, 58] },
+  { id: 'fechar', n: 'Fechar tudo', d: 'Apaga luzes, A/C e som', icon: 'power', f: [-3, 0, 23, 60, 90, 58] },
 ];
 const SCENE_ON = {   // o que cada cena deixa ligado (para as miniaturas)
   culto: ['palco', 'plateia', 'telao', 'som', 'ac_templo', 'hall', 'banheiros', 'fachada', 'estacionamento'],
@@ -256,7 +258,7 @@ const CSS = `:host{
 .ctl button{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.06)!important;display:grid!important;place-items:center}
 .ctl .pp{width:46px;height:46px;background:var(--mint)!important;color:#063126}
 .ctl button:disabled{opacity:.35;pointer-events:none}
-/* clima (Ares e Templo) */
+/* clima (A/C e Templo) */
 .clim{display:flex;flex-direction:column}
 .clim.off .temp b{color:var(--tx3)}
 .dial{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
@@ -271,11 +273,40 @@ const CSS = `:host{
 .mode svg{width:13px!important;height:13px!important}
 .mode.on{background:var(--mint)!important;color:#063126!important;border-color:var(--mint)!important;font-weight:600}
 .clim.na{opacity:.55}
-.ares{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:14px}
-.ares .clim{padding:18px 20px}
-.ares .temp b{font-size:54px}
-.ares .dial{margin-top:auto;padding:0 12%}
-.ares .modes{margin-top:auto}
+.ares{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr));gap:14px}
+.ares .clim{padding:14px 18px}
+.ares .tplac{grid-row:1 / span 3;padding:18px 20px}
+.ares .tplac .temp b{font-size:48px}
+.ares .clim:not(.tplac) .temp b{font-size:32px}
+.ares .clim:not(.tplac) .dial{margin-top:auto;padding:0 10%}
+.ares .clim:not(.tplac) .modes{margin-top:auto}
+.tright .clim .temp b{font-size:32px}
+.tright .clim .dial{margin-top:6px}
+/* v1.1: os 5 splits do templo */
+.splh{display:flex;gap:6px;align-items:center;margin-top:12px}
+.splh small{font-size:10px;letter-spacing:.14em;color:var(--tx3);font-weight:600;margin-right:auto}
+.allb{height:28px;padding:0 12px!important;border-radius:99px;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.05)!important;border:1px solid var(--line)!important;color:#dfeef0;white-space:nowrap}
+.allb.on{background:var(--mint)!important;color:#063126!important;border-color:var(--mint)!important}
+.spls{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.spl{display:grid;grid-template-columns:minmax(0,1fr) auto auto 34px;align-items:center;gap:8px;padding:5px 8px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.spl.on{border-color:rgba(31,224,163,.35)}
+.spl.na{opacity:.5}
+.spl .sn b{display:block;font-size:12.5px;font-weight:600}
+.spl .sn span{display:block;font-size:10.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spl.on .sn span{color:#a9e9d3}
+.spl .st{display:flex;align-items:center;gap:4px}
+.spl .st b{font:600 14px var(--fd);min-width:32px;text-align:center;font-variant-numeric:tabular-nums}
+.rb.s{width:24px;height:24px;border-radius:8px}
+.rb.s svg{width:12px!important;height:12px!important}
+.spl .sm{display:flex;gap:3px}
+.mode.s{width:24px;height:24px;padding:0!important;gap:0}
+.mode.s svg{width:12px!important;height:12px!important}
+.splnote{font-size:11px;color:var(--tx2);margin-top:10px;line-height:1.45;border:1px dashed rgba(255,255,255,.18);border-radius:12px;padding:8px 10px}
+.splnote code{color:#dfeef0}
+.ares .spls{gap:8px;margin-top:12px}
+.ares .spl{padding:9px 10px}
+.ares .spl .sn b{font-size:13.5px}
+.splh small{white-space:nowrap}
 .mini{display:flex;justify-content:space-between;margin-top:auto;padding-top:10px;border-top:1px solid var(--line);font-size:11.2px;color:var(--tx2)}
 .mini span{display:flex;align-items:center;gap:6px}
 .mini svg{width:14px!important;height:14px!important}
@@ -349,7 +380,7 @@ const HTML = `
       <a class="on" data-nav="home">${svg('grid')}Início</a>
       <a data-nav="rooms">${svg('door')}Ambientes<span class="cnt">${ROOMS.length}</span></a>
       <a data-nav="templo">${svg('church')}Templo / Culto</a>
-      <a data-nav="ares">${svg('snow')}Ares<span class="cnt" id="nav-ac">0</span></a>
+      <a data-nav="ares">${svg('snow')}A/C<span class="cnt" id="nav-ac">0</span></a>
       <a data-nav="alexa" id="nav-alexa" hidden>${svg('mic')}Alexa</a>
     </nav>
     <div class="foot"><div class="row"><span class="dot" id="hadot"></span><span id="hastat">Home Assistant online</span></div><p><span id="ndev">0</span> dispositivos · ${BLOCKS.length} blocos<br>Sincronizado há <span id="sync">1 s</span></p></div>
@@ -365,7 +396,7 @@ const HTML = `
       <div class="stat"><div class="ic" id="st-l-ic">${svg('bulb')}</div><div><b id="st-l"></b><span id="st-l2"></span></div></div>
       <div class="stat"><div class="ic" id="st-ac-ic">${svg('snow')}</div><div><b id="st-ac"></b><span id="st-ac2"></span></div></div>
       <div class="stat"><div class="ic" id="st-c-ic">${svg('tv')}</div><div><b id="st-c"></b><span id="st-c2"></span></div></div>
-      <button type="button" class="act" id="act-off"><div class="ic">${svg('power')}</div><div><b>Fechar tudo</b><span>Luzes, ares e som</span></div></button>
+      <button type="button" class="act" id="act-off"><div class="ic">${svg('power')}</div><div><b>Fechar tudo</b><span>Luzes, A/C e som</span></div></button>
     </section>
     <section class="lower">
       <div class="left">
@@ -521,7 +552,7 @@ class IgrejaPainelCard extends HTMLElement {
   _isOn(k) {
     const s = this._st(k); if (!s) return false; const v = s.state;
     if (k === 'telao') return !['off', 'standby', 'unavailable', 'unknown'].includes(v);
-    if (ACS.includes(k)) return !['off', 'unavailable', 'unknown'].includes(v);
+    if (ACS.includes(k) || SPLITS.includes(k)) return !['off', 'unavailable', 'unknown'].includes(v);
     return v === 'on';
   }
   _derive() {
@@ -533,7 +564,7 @@ class IgrejaPainelCard extends HTMLElement {
     const pl = (this._st('plateia') || {}).attributes || {}; S.plateiaBri = pl.brightness != null ? Math.max(1, Math.round(pl.brightness / 2.55)) : 100;
     const tv = this._st('telao'), ta = (tv && tv.attributes) || {};
     S.telao = { state: tv ? tv.state : 'unavailable', title: ta.media_title || '', artist: ta.media_artist || ta.app_name || '', vol: ta.volume_level != null ? Math.round(ta.volume_level * 100) : null };
-    for (const k of ACS) { const s = this._st(k), a = (s && s.attributes) || {};
+    for (const k of [...ACS, ...SPLITS]) { const s = this._st(k), a = (s && s.attributes) || {};
       S.ac[k] = { t: a.temperature != null ? Math.round(a.temperature) : '--', hvac: s ? s.state : 'unavailable', mode: HVAC_PT[s && s.state] || 'Frio', amb: a.current_temperature,
         min: a.min_temp || 16, max: a.max_temp || 31, modes: a.hvac_modes || null }; }
     const pr = this._st('presenca'); S.pres = pr ? pr.state === 'on' : null;
@@ -547,8 +578,17 @@ class IgrejaPainelCard extends HTMLElement {
     // comando otimista: vale até o HA confirmar (ou 4 s)
     const now = Date.now();
     for (const [k, p] of Object.entries(this._pend)) { if (now - p.t > 4000 || S.on[k] === p.v) delete this._pend[k]; else S.on[k] = p.v; }
+    // A/C do Templo com splits: ligado se qualquer split estiver ligado; a temperatura vem da entidade geral ou do 1º split
+    S.splits = this._splits();
+    if (S.splits.length) { S.on.ac_templo = S.on.ac_templo || S.splits.some((k) => S.on[k]); S.na.ac_templo = S.na.ac_templo && S.splits.every((k) => S.na[k]);
+      if (S.ac.ac_templo.t === '--') { const f = S.splits.map((k) => S.ac[k]).find((a) => a.t !== '--'); if (f) Object.assign(S.ac.ac_templo, { t: f.t, min: f.min, max: f.max, modes: f.modes, amb: f.amb }); }
+      if (!this._st('ac_templo')) { const f = S.splits.find((k) => S.on[k]); S.ac.ac_templo.mode = f ? S.ac[f].mode : S.ac.ac_templo.mode; } }
     this.S = S;
   }
+  _splits() { return SPLITS.filter((k) => this._ent[k]); }
+  // entidades que um comando de A/C atinge: o A/C do Templo com splits vale para todos eles (e a entidade geral, se existir)
+  _acKeys(k) { if (k !== 'ac_templo') return [k]; const sp = this._splits(); return sp.length ? [...sp, ...(this._st('ac_templo') ? ['ac_templo'] : [])] : [k]; }
+  _acIds(k) { const ids = this._acKeys(k).map((x) => this._ent[x]).filter(Boolean); return ids.length === 1 ? ids[0] : ids; }
   _preset(a) {
     if (a.color_mode === 'color_temp' || (!a.rgb_color && a.color_temp_kelvin)) return (a.color_temp_kelvin || 2700) < 3600 ? 'Quente' : 'Branco';
     const rgb = a.rgb_color; if (!rgb) return 'Quente';
@@ -565,7 +605,7 @@ class IgrejaPainelCard extends HTMLElement {
     this.shadowRoot.innerHTML = `<style>${CSS}</style><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${ICONS}</defs></svg>${HTML}`;
     this.$('scenes').innerHTML = SCENES.map((s) => `<button type="button" class="scene" data-s="${s.id}" aria-label="Cena ${esc(s.n)}"><div class="pv"><div class="bd">${svg(s.icon)}</div></div><div class="tx"><b>${esc(s.n)}</b><span>${esc(s.d)}</span></div></button>`).join('');
     this.$('tabs').innerHTML = BLOCKS.map((b) => `<button type="button" class="tab" data-b="${b.id}">${esc(b.n)}</button>`).join('');
-    this.$('ares').innerHTML = ACS.map((k) => `<div class="card clim" data-ac="${k}"></div>`).join('');
+    this.$('ares').innerHTML = ACS.map((k) => `<div class="card clim${k === 'ac_templo' ? ' tplac' : ''}" data-ac="${k}"></div>`).join('');
     this._applyConfig();
     this._bind();
     requestAnimationFrame(() => { this._init3D(); this._render(); });
@@ -634,7 +674,7 @@ class IgrejaPainelCard extends HTMLElement {
       plateia: { on: !!on.plateia, bri: sid ? ({ culto: 60, ensaio: 25 }[sid] || 100) : S.plateiaBri || 100 },
       telao: { on: !!on.telao, title: sid ? '' : (S.telao && S.telao.title) || '' },
       som: !!on.som,
-      ac: Object.fromEntries(ACS.map((k) => [k, { on: !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null) }])),
+      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null) }])),
       porta: sid ? sid === 'chegada' : !!S.porta,
       night: sid ? true : S.night !== false,
     };
@@ -645,6 +685,7 @@ class IgrejaPainelCard extends HTMLElement {
     if (!hit && v.pick && this._p3.roomAt) { const g = v.pick(px, py); const r = g && this._p3.roomAt(g[0], g[1]); if (r) hit = { kind: 'room', room: r }; }
     if (!hit) return;
     const c = this._config || {};
+    if (hit.key && SPLITS.includes(hit.key) && !this._ent[hit.key]) hit = Object.assign({}, hit, { key: 'ac_templo' });   // split sem entidade: vale o A/C do Templo
     if (!planOnly && hit.kind !== 'room' && hit.key && TOG.includes(hit.key) && c.toque !== false) { this._toggle(hit.key); return; }
     if (hit.room && RM[hit.room]) this._select('r:' + hit.room, true);
   }
@@ -685,24 +726,32 @@ class IgrejaPainelCard extends HTMLElement {
     else if (k === 'plateia') { txt = on ? `Acesa · ${S.plateiaBri}%` : 'Apagada'; more = 'Brilho'; }
     else if (k === 'telao') { icon = 'tv'; txt = on ? (S.telao.title || 'Ligado') : 'Desligado'; more = 'Controlar'; }
     else if (k === 'som') { icon = 'speaker'; txt = on ? 'Ligado' : 'Desligado'; }
-    else if (ACS.includes(k)) { const a = S.ac[k]; icon = 'snow'; txt = on ? `${a.t} °C · ${a.mode}` : 'Desligado'; more = 'Temperatura e modo'; }
+    else if (ACS.includes(k) || SPLITS.includes(k)) { const a = S.ac[k], sp = k === 'ac_templo' ? S.splits : [], n = sp.filter((x) => S.on[x]).length; icon = 'snow';
+      txt = on ? (sp.length ? `${n} de ${sp.length} splits · ${a.t} °C` : `${a.t} °C · ${a.mode}`) : 'Desligado'; more = sp.length ? 'Splits, temperatura e modo' : 'Temperatura e modo'; }
     else if (k === 'fachada') txt = on ? 'Letreiro + arandelas' : 'Apagada';
     else if (k === 'estacionamento') txt = on ? 'Postes acesos' : 'Apagado';
     return { n: NAMES[k], icon, st: na ? 'Indisponível' : txt, more, on: on && !na, na };
   }
   _toggle(k) {
+    if (k === 'ac_templo' && this.S.splits.length) { this._acAll(!this.S.on.ac_templo); return; }
     if (!TOG.includes(k)) return; const was = !!this.S.on[k]; this._scene = null;
     this._set(k, !was); this._derive(); this._render(); this._toast(`${NAMES[k]}: ${this._dev(k).st}`);
   }
+  // A/C do Templo: Ligar todos / Desligar todos (os splits de uma vez, numa chamada só)
+  _acAll(v) {
+    const keys = this._acKeys('ac_templo'); keys.forEach((k) => this._pendKey(k, v)); this._scene = null;
+    this._call('climate', v ? 'turn_on' : 'turn_off', { entity_id: this._acIds('ac_templo') });
+    this._derive(); this._render(); this._toast(`A/C do Templo: ${keys.length > 1 ? (v ? 'todos ligados' : 'todos desligados') : (v ? 'ligado' : 'desligado')}`);
+  }
   _setMany(keys, v) { keys.filter((k) => TOG.includes(k)).forEach((k) => this._set(k, v)); }
-  _block(b, v) {   // "Tudo" do bloco: liga só as luzes; desliga luzes, ares, telão e som
+  _block(b, v) {   // "Tudo" do bloco: liga só as luzes; desliga luzes, A/C, telão e som
     const items = blockItems(b).filter((k) => TOG.includes(k)); this._scene = null;
     this._setMany(v ? items.filter((k) => LIGHTS.includes(k)) : items, v); this._derive(); this._render();
     this._toast(`${BK[b].n}: ${v ? 'luzes acesas' : 'tudo desligado'}`);
   }
   _runScene(id) {
     const on = (k, x) => this._set(k, true, x), off = (k) => this._set(k, false);
-    const acCool = (k) => { this._pendKey(k, true); this._call('climate', 'set_hvac_mode', { entity_id: this._ent[k], hvac_mode: 'cool' }); };
+    const acCool = (k) => { this._acKeys(k).forEach((x) => this._pendKey(x, true)); this._call('climate', 'set_hvac_mode', { entity_id: this._acIds(k), hvac_mode: 'cool' }); };
     if (id === 'culto') { on('palco', { rgb_color: [255, 180, 110], brightness_pct: 90 }); on('plateia', { brightness_pct: 60 }); on('telao'); on('som'); acCool('ac_templo');
       ['hall', 'banheiros'].forEach((k) => on(k)); if (this.S.night) ['fachada', 'estacionamento'].forEach((k) => on(k)); }
     if (id === 'ensaio') { on('palco', { rgb_color: [40, 110, 255], brightness_pct: 70 }); on('plateia', { brightness_pct: 25 }); on('telao'); on('som'); acCool('ac_templo'); }
@@ -714,14 +763,15 @@ class IgrejaPainelCard extends HTMLElement {
   }
   _acTemp(k, d) {
     const a = this.S.ac[k]; if (!a || a.t === '--') return; const cur = this._local[k] != null ? this._local[k] : a.t;
-    const t = Math.max(a.min, Math.min(a.max, cur + d)); this._local[k] = t; this._scene = null; this._render();
+    const t = Math.max(a.min, Math.min(a.max, cur + d)), keys = this._acKeys(k); keys.forEach((x) => { this._local[x] = t; }); this._local[k] = t; this._scene = null; this._render();
     clearTimeout(this._acT && this._acT[k]); this._acT = this._acT || {};
-    this._acT[k] = setTimeout(() => { this._call('climate', 'set_temperature', { entity_id: this._ent[k], temperature: t }); setTimeout(() => { delete this._local[k]; }, 3000); }, 600);
+    this._acT[k] = setTimeout(() => { this._call('climate', 'set_temperature', { entity_id: this._acIds(k), temperature: t }); setTimeout(() => { [k, ...keys].forEach((x) => delete this._local[x]); }, 3000); }, 600);
   }
   _acMode(k, m) {
     const M = MODES.find((x) => x[0] === m); const modes = this.S.ac[k] && this.S.ac[k].modes;
     let hv = M[2]; if (hv === 'heat_cool' && modes && !modes.includes('heat_cool') && modes.includes('auto')) hv = 'auto';
-    this._pendKey(k, true); this._scene = null; this._call('climate', 'set_hvac_mode', { entity_id: this._ent[k], hvac_mode: hv }); this._toast(`${NAMES[k]}: ${m}`);
+    this._acKeys(k).forEach((x) => this._pendKey(x, true)); this._scene = null; this._call('climate', 'set_hvac_mode', { entity_id: this._acIds(k), hvac_mode: hv });
+    this._toast(`${SPLITS.includes(k) ? 'A/C do Templo · ' : ''}${NAMES[k]}${k === 'ac_templo' && this.S.splits.length ? ' (todos)' : ''}: ${m}`);
   }
   _palcoColor(n) {
     const p = PRESETS.find((x) => x[0] === n), data = { entity_id: this._ent.palco };
@@ -742,8 +792,8 @@ class IgrejaPainelCard extends HTMLElement {
     $('st-p2').textContent = `Presença${S.temp != null ? ` · ${S.temp} °C` : ''}`; $('st-p-ic').classList.toggle('off', !S.pres);
     $('st-l').textContent = `${lit.length} ${lit.length === 1 ? 'luz acesa' : 'luzes acesas'}`;
     $('st-l2').textContent = `de ${LIGHTS.length}` + (lit.length ? ' · ' + lit.map((l) => NAMES[l]).join(', ') : ' · tudo apagado'); $('st-l-ic').classList.toggle('off', !lit.length);
-    $('st-ac').textContent = acs.length ? `${acs.length} ${acs.length === 1 ? 'ar ligado' : 'ares ligados'}` : 'Ares desligados';
-    $('st-ac2').textContent = acs.length ? acs.map((k) => `${NAMES[k].replace('Ar d', '').replace(/^[oa] /, '')} ${S.ac[k].t}°`).join(' · ') : 'Templo, Pastoral, Mídia, Voluntariado'; $('st-ac-ic').classList.toggle('off', !acs.length);
+    $('st-ac').textContent = acs.length ? `${acs.length} A/C ${acs.length === 1 ? 'ligado' : 'ligados'}` : 'A/C desligados';
+    $('st-ac2').textContent = acs.length ? acs.map((k) => `${AC_SHORT[k]} ${k === 'ac_templo' && S.splits.length ? S.splits.filter((x) => S.on[x]).length + '/' + S.splits.length : S.ac[k].t + '°'}`).join(' · ') : 'Templo, Pastoral, Mídia, Voluntariado'; $('st-ac-ic').classList.toggle('off', !acs.length);
     const culto = S.on.telao || S.on.som;
     $('st-c').textContent = culto ? 'Culto no ar' : 'Telão e som'; $('st-c2').textContent = `Telão ${S.on.telao ? (S.telao.title || 'ligado') : 'desligado'} · Som ${S.on.som ? 'ligado' : 'desligado'}`;
     $('st-c-ic').classList.toggle('off', !culto);
@@ -751,7 +801,7 @@ class IgrejaPainelCard extends HTMLElement {
     $('porta-t').textContent = S.porta == null ? '—' : S.porta ? 'aberta' : 'fechada';
     $('lg-on').textContent = `${lit.length} ${lit.length === 1 ? 'luz acesa' : 'luzes acesas'}`;
     $('lg-off').textContent = `${LIGHTS.length - lit.length} apagada${LIGHTS.length - lit.length === 1 ? '' : 's'}`;
-    const bits = []; if (S.on.palco) bits.push('o palco está aceso'); if (S.on.telao) bits.push('o telão está ligado'); if (acs.length) bits.push(acs.length === 1 ? 'um ar está ligado' : `${acs.length} ares estão ligados`);
+    const bits = []; if (S.on.palco) bits.push('o palco está aceso'); if (S.on.telao) bits.push('o telão está ligado'); if (acs.length) bits.push(acs.length === 1 ? 'um A/C está ligado' : `${acs.length} A/C estão ligados`);
     $('mood').textContent = bits.length ? bits.join(', ').replace(/^./, (c) => c.toUpperCase()) + '.' : (lit.length ? 'Algumas luzes acesas.' : 'Igreja fechada, tudo apagado.');
     $('wx').textContent = `Palmas (TO)${S.out != null ? ` · ${S.out} °C lá fora` : ''}`;
     // cenas
@@ -817,7 +867,19 @@ class IgrejaPainelCard extends HTMLElement {
       <div class="temp"><b>${t}<sup>°C</sup></b><span>${on ? `${a.mode} · ${amb}` : `Desligado · ${amb}`}</span></div>
       <button type="button" class="rb" data-tmp="${k}" data-d="1" aria-label="Aumentar temperatura">${svg('plus')}</button></div>
       <div class="modes">${MODES.map(([m, ic]) => `<button type="button" class="mode ${on && a.mode === m ? 'on' : ''}" data-ack="${k}" data-m="${m}">${svg(ic)}${m}</button>`).join('')}</div>` +
-      (big ? '' : `<div class="mini"><span>${svg('radar')}Presença <b>${S.pres == null ? '—' : S.pres ? 'Ocupado' : 'Vazio'}</b></span><span>${svg('therm')}Templo <b>${S.temp == null ? '—' : S.temp + ' °C'}</b></span></div>`);
+      (k === 'ac_templo' ? this._splitsHtml() : '') +
+      (big || (k === 'ac_templo' && S.splits.length) ? '' : `<div class="mini"><span>${svg('radar')}Presença <b>${S.pres == null ? '—' : S.pres ? 'Ocupado' : 'Vazio'}</b></span><span>${svg('therm')}Templo <b>${S.temp == null ? '—' : S.temp + ' °C'}</b></span></div>`);
+  }
+  // v1.1: Ligar/Desligar todos e um controle por split (liga/desliga, temperatura, modo)
+  _splitsHtml() {
+    const S = this.S, sp = S.splits, n = sp.filter((k) => S.on[k]).length;
+    const head = `<div class="splh"><small>${sp.length ? `SPLITS · ${n}/${sp.length} LIGADOS` : 'TODOS OS SPLITS'}</small><button type="button" class="allb ${sp.length ? (n === sp.length ? 'on' : '') : (S.on.ac_templo ? 'on' : '')}" data-acall="on">Ligar todos</button><button type="button" class="allb ${(sp.length ? n === 0 : !S.on.ac_templo) ? 'on' : ''}" data-acall="off">Desligar todos</button></div>`;
+    if (!sp.length) return head + '<div class="splnote">Controle separado dos 5 splits: informe <code>ac_templo_1</code> … <code>ac_templo_5</code> em <code>entities</code>. Sem eles, o A/C do Templo usa a entidade única <code>ac_templo</code>.</div>';
+    return head + '<div class="spls">' + sp.map((k) => { const a = S.ac[k], on = !!S.on[k], na = S.na[k], t = this._local[k] != null ? this._local[k] : a.t;
+      return `<div class="spl ${on ? 'on' : ''} ${na ? 'na' : ''}" data-split="${k}"><div class="sn"><b>${NAMES[k]}</b><span>${na ? 'Indisponível' : on ? a.mode : 'Desligado'}</span></div>
+        <div class="st"><button type="button" class="rb s" data-tmp="${k}" data-d="-1" aria-label="${NAMES[k]}: diminuir temperatura">${svg('minus')}</button><b>${t}°</b><button type="button" class="rb s" data-tmp="${k}" data-d="1" aria-label="${NAMES[k]}: aumentar temperatura">${svg('plus')}</button></div>
+        <div class="sm">${MODES.map(([m, ic]) => `<button type="button" class="mode s ${on && a.mode === m ? 'on' : ''}" data-ack="${k}" data-m="${m}" title="${m}" aria-label="${NAMES[k]}: ${m}">${svg(ic)}</button>`).join('')}</div>
+        <button type="button" class="tg ${on ? 'on' : ''}" data-t="${k}" aria-label="Ligar ou desligar ${NAMES[k]}"></button></div>`; }).join('') + '</div>';
   }
   _clock() {
     if (!this._built) return;
@@ -853,6 +915,7 @@ class IgrejaPainelCard extends HTMLElement {
       if ((x = q('.tab'))) { this._select('b:' + x.dataset.b); return; }
       if ((x = q('[data-bsel]'))) { this._select('b:' + x.dataset.bsel); return; }
       if ((x = q('[data-rsel]'))) { this._select('r:' + x.dataset.rsel); return; }
+      if ((x = q('[data-acall]'))) { this._acAll(x.dataset.acall === 'on'); return; }
       if ((x = q('[data-tmp]'))) { this._acTemp(x.dataset.tmp, +x.dataset.d); return; }
       if ((x = q('[data-ack]'))) { this._acMode(x.dataset.ack, x.dataset.m); return; }
       if ((x = q('[data-c]'))) { this._palcoColor(x.dataset.c); return; }

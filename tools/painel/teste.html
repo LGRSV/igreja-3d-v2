@@ -7,6 +7,11 @@ const ST = {
   'light.palco_rgb': ['off', { rgb_color: [255, 180, 110], brightness: 230 }], 'light.templo_plateia': ['on', { brightness: 153 }],
   'media_player.telao_led': ['off', {}], 'switch.som_templo': ['off', {}],
   'climate.ar_templo': ['off', { temperature: 22, current_temperature: 27, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo_1': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo_2': ['cool', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo_3': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo_4': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
+  'climate.ar_templo_5': ['off', { temperature: 22, current_temperature: 26, min_temp: 16, max_temp: 30, hvac_modes: ['off', 'cool', 'auto', 'dry', 'fan_only'] }],
   'binary_sensor.presenca_templo': ['on', {}], 'sensor.temperatura_templo': ['26.4', {}], 'light.hall_entrada': ['on', {}], 'light.fachada_letreiro': ['off', {}],
   'light.estacionamento': ['off', {}], 'binary_sensor.porta_principal': ['off', {}], 'light.banheiros': ['off', {}], 'light.sala_pastoral': ['off', {}],
   'climate.ar_sala_pastoral': ['cool', { temperature: 23, current_temperature: 25 }], 'light.recepcao': ['off', {}], 'light.administrativo': ['off', {}],
@@ -40,7 +45,9 @@ window.__setState = (id, st, at) => { states[id] = { entity_id: id, state: st, a
 const p = new URLSearchParams(location.search);
 await import(p.get('card') || './igreja-painel-card.js');
 card = document.createElement('igreja-painel-card'); window.__card = card;
-card.setConfig(JSON.parse(p.get('cfg') || '{"alexa_device":"dev1"}'));
+const SPL = Object.fromEntries([1, 2, 3, 4, 5].map((i) => ['ac_templo_' + i, 'climate.ar_templo_' + i]));
+const cfg = JSON.parse(p.get('cfg') || '{"alexa_device":"dev1"}'); if (p.get('splits') !== '0') cfg.entities = Object.assign({}, SPL, cfg.entities || {});
+card.setConfig(cfg);
 document.getElementById('host').appendChild(card);
 card.hass = mk();
 window.__ready = true;

@@ -45,7 +45,8 @@ def run(mode):
         E("window.__calls.length=0"); E(f"{R}.querySelector('.scene[data-s=culto]').click()")
         calls = E("window.__calls")
         ok(any(c[0] == 'light' and c[1] == 'turn_on' and c[2].get('entity_id') == 'light.palco_rgb' and c[2].get('rgb_color') for c in calls), f'[{mode}] Culto acende o palco com cor')
-        ok(any(c[0] == 'climate' and c[1] == 'set_hvac_mode' and c[2]['entity_id'] == 'climate.ar_templo' for c in calls), f'[{mode}] Culto liga o ar do templo')
+        ids = lambda c: c[2]['entity_id'] if isinstance(c[2]['entity_id'], list) else [c[2]['entity_id']]
+        ok(any(c[0] == 'climate' and c[1] == 'set_hvac_mode' and 'climate.ar_templo_5' in ids(c) for c in calls), f'[{mode}] Culto liga o A/C do templo (os 5 splits)')
         ok(any(c[0] == 'media_player' and c[1] == 'turn_on' for c in calls) and any(c[0] == 'switch' and c[2]['entity_id'] == 'switch.som_templo' for c in calls), f'[{mode}] Culto liga telão e som')
         ok(E(f"{R}.querySelector('.scene[data-s=culto]').classList.contains('on')"), f'[{mode}] cena marcada como ativa')
         pg.wait_for_timeout(800)
@@ -86,6 +87,10 @@ def run(mode):
             ok(vis == 'grid' and box[0] and box[1] and box[2] > 300, f'[{mode}] página {nav} visível e dentro da área {box}')
             ok(E(f"getComputedStyle({R}.querySelector('.lower')).display") == 'none', f'[{mode}] {nav} esconde o Início')
             pg.screenshot(path=str(OUT / f'{mode}-{nav}.png'))
+            txt = E(f"{R}.getElementById('app').innerText")
+            import re as _re
+            bad = _re.findall(r'\b(?:Ar|Ares|ar|ares)\b(?! condicionado)', txt)
+            ok(not bad and 'A/C' in txt, f'[{mode}] {nav}: textos dizem A/C {bad[:3]}')
             if nav == 'rooms':
                 E(f"{R}.querySelector('[data-rsel=voluntariado]').click()")
                 ok(E(f"{R}.getElementById('amb-name').textContent") == 'Voluntariado', f'[{mode}] Ambientes seleciona Voluntariado')
@@ -99,6 +104,26 @@ def run(mode):
             if nav == 'ares':
                 E("window.__calls.length=0"); E(f"{R}.querySelector('[data-tmp=ac_midia][data-d=\"1\"]').click()"); pg.wait_for_timeout(900)
                 ok(E("window.__calls.some(c=>c[1]==='set_temperature'&&c[2].entity_id==='climate.ar_midia'&&c[2].temperature===22)"), f'[{mode}] ar da mídia 21→22 °C')
+                ids = lambda c: c[2]['entity_id'] if isinstance(c[2]['entity_id'], list) else [c[2]['entity_id']]
+                SP = [f'climate.ar_templo_{i}' for i in range(1, 6)]
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-acall=on]').click()"); c = E("window.__calls")
+                ok(len(c) == 1 and c[0][1] == 'turn_on' and all(x in ids(c[0]) for x in SP), f'[{mode}] Ligar todos chama os 5 splits numa chamada')
+                pg.wait_for_timeout(500)
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-acall=off]').click()"); c = E("window.__calls")
+                ok(len(c) == 1 and c[0][1] == 'turn_off' and all(x in ids(c[0]) for x in SP), f'[{mode}] Desligar todos chama os 5 splits')
+                pg.wait_for_timeout(500)
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-t=ac_templo_3]').click()"); c = E("window.__calls")
+                ok(len(c) == 1 and ids(c[0]) == ['climate.ar_templo_3'] and c[0][1] == 'turn_on', f'[{mode}] Split 3 liga só ele {c}')
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-tmp=ac_templo_4][data-d=\"1\"]').click()"); pg.wait_for_timeout(900); c = E("window.__calls")
+                ok(len(c) == 1 and c[0][1] == 'set_temperature' and ids(c[0]) == ['climate.ar_templo_4'] and c[0][2]['temperature'] == 23, f'[{mode}] temperatura do Split 4 só nele')
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-ack=ac_templo_2][data-m=Seco]').click()"); c = E("window.__calls")
+                ok(len(c) == 1 and ids(c[0]) == ['climate.ar_templo_2'] and c[0][2]['hvac_mode'] == 'dry', f'[{mode}] modo do Split 2 só nele')
+                E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-tmp=ac_templo][data-d=\"-1\"]').click()"); pg.wait_for_timeout(900); c = E("window.__calls")
+                ok(len(c) == 1 and all(x in ids(c[0]) for x in SP), f'[{mode}] temperatura geral vale para os 5 splits')
+                E("window.__calls.length=0"); E("window.__card._p3hit(window.__card._p3tpl || {}, 0, 0, {kind:'ac', key:'ac_templo_2', room:'templo'})"); c = E("window.__calls")
+                ok(len(c) == 1 and ids(c[0]) == ['climate.ar_templo_2'], f'[{mode}] toque no 3D com key ac_templo_2 alterna só o Split 2')
+                st = E("window.__card._p3state()")
+                ok(all(f'ac_templo_{i}' in st['ac'] for i in range(1, 6)), f'[{mode}] estado do motor traz ac.ac_templo_1…5')
                 E("window.__calls.length=0"); E(f"{R}.querySelector('[data-ack=ac_pastoral][data-m=Seco]').click()")
                 ok(E("window.__calls.some(c=>c[1]==='set_hvac_mode'&&c[2].hvac_mode==='dry')"), f'[{mode}] modo Seco')
             if nav == 'alexa':
@@ -122,6 +147,23 @@ def run(mode):
         b.close()
     srv.shutdown()
 
-run('motor'); run('flat')
+def sem_splits():
+    d = pathlib.Path(tempfile.mkdtemp(prefix='igp-www-'))
+    shutil.copy(ROOT / 'igreja-painel-card.js', d); shutil.copy(HERE / 'teste.html', d)
+    srv = serve(d)
+    with sync_playwright() as p:
+        b = p.chromium.launch(channel='chrome', headless=True); pg = b.new_page(viewport={'width': 1280, 'height': 800})
+        pg.goto(f'http://127.0.0.1:{srv.server_address[1]}/teste.html?splits=0&cfg=' + '{"height":"100vh"}'); pg.wait_for_function('window.__ready'); pg.wait_for_timeout(1500)
+        E = lambda js: pg.evaluate(js); R = "window.__card.shadowRoot"
+        E(f"{R}.querySelector('[data-nav=ares]').click()"); pg.wait_for_timeout(300)
+        ok(E(f"!!{R}.querySelector('.tplac .splnote') && !{R}.querySelector('.tplac .spl')"), '[sem splits] nota no lugar dos splits')
+        E("window.__calls.length=0"); E(f"{R}.querySelector('.tplac [data-acall=off]').click()"); c = E("window.__calls")
+        ok(len(c) == 1 and c[0][2]['entity_id'] == 'climate.ar_templo', '[sem splits] Desligar todos usa a entidade única ac_templo')
+        E("window.__calls.length=0"); E("window.__card._p3hit({}, 0, 0, {kind:'ac', key:'ac_templo_3', room:'templo'})"); c = E("window.__calls")
+        ok(len(c) == 1 and c[0][2]['entity_id'] == 'climate.ar_templo', '[sem splits] toque em split vale o A/C do Templo')
+        pg.screenshot(path=str(OUT / 'sem-splits-ac.png')); b.close()
+    srv.shutdown()
+
+run('motor'); run('flat'); sem_splits()
 print(f'\n{len(fails)} falha(s). Screenshots em {OUT}')
 sys.exit(1 if fails else 0)

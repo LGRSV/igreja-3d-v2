@@ -62,21 +62,36 @@ class P3View {
     this.target.set((x0 + x1) / 2, this.o.ty != null ? this.o.ty : 0.3, (z0 + z1) / 2);
     const pts = [];
     for (const x of [x0, x1]) for (const z of [z0, z1]) for (const y of [0, hy]) pts.push(new THREE.Vector3(x, y, z));
+    // parede do palco (x = 0, z 12,4–44,0, 8,5 m): entra no enquadramento quando aparece nele
+    if (x0 < 0.6 && z1 > 12.4 && z0 < 44.0) for (const z of [Math.max(z0, 12.4), Math.min(z1, 44.0)]) pts.push(new THREE.Vector3(0, SPEC.H_TEMPLO, z));
     const s = this._safe(w, h), _v = new THREE.Vector3();
-    let lo = 0.5, hi = 900;
-    for (let i = 0; i < 40; i++) {
-      const m = (lo + hi) / 2; this.dist = m; this._place(w, h, 1);
-      let ok = true;
-      for (const p of pts) { _v.copy(p).project(this.cam); const a = (_v.x + 1) / 2 * w, b = (1 - _v.y) / 2 * h; if (_v.z > 1 || a < s.l || a > w - s.r || b < s.t || b > h - s.b) { ok = false; break; } }
-      if (ok) hi = m; else lo = m;
+    const search = () => {
+      let lo = 0.5, hi = 900;
+      for (let i = 0; i < 40; i++) {
+        const m = (lo + hi) / 2; this.dist = m; this._place(w, h, 1);
+        let ok = true;
+        for (const p of pts) { _v.copy(p).project(this.cam); const a = (_v.x + 1) / 2 * w, b = (1 - _v.y) / 2 * h; if (_v.z > 1 || a < s.l || a > w - s.r || b < s.t || b > h - s.b) { ok = false; break; } }
+        if (ok) hi = m; else lo = m;
+      }
+      this.dist = hi; this._place(w, h, 1);
+    };
+    // centraliza o que aparece (não o alvo) na área livre: mede a caixa projetada e desloca a vista; 2 passadas
+    this._shift = [0, 0];
+    for (let k = 0; k < 2; k++) {
+      search();
+      let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+      for (const p of pts) { _v.copy(p).project(this.cam); const a = (_v.x + 1) / 2 * w, b = (1 - _v.y) / 2 * h; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); }
+      const ex = (s.l + w - s.r) / 2 - (a0 + a1) / 2, ey = (s.t + h - s.b) / 2 - (b0 + b1) / 2;
+      if (Math.abs(ex) < 1 && Math.abs(ey) < 1) break;
+      this._shift = [this._shift[0] + ex, this._shift[1] + ey];
     }
-    this.dist = hi; this._place(w, h);
+    search(); this._place(w, h);
   }
   _place(w, h, z = this.zoom) {
     const az = this.az * P3_DEG, el = this.el * P3_DEG, d = this.dist / z, t = this.target;
     this.cam.position.set(t.x + d * Math.cos(el) * Math.sin(az), t.y + d * Math.sin(el), t.z + d * Math.cos(el) * Math.cos(az));
     this.cam.up.set(0, 1, 0); this.cam.lookAt(t);
-    const s = this._safe(w, h), dx = (s.l + w - s.r) / 2 - w / 2, dy = (s.t + h - s.b) / 2 - h / 2;
+    const s = this._safe(w, h), sh = this._shift || [0, 0], dx = (s.l + w - s.r) / 2 - w / 2 + sh[0], dy = (s.t + h - s.b) / 2 - h / 2 + sh[1];
     const fw = w + 2 * Math.abs(dx), fh = h + 2 * Math.abs(dy);
     this.cam.aspect = fw / fh;
     this.cam.setViewOffset(fw, fh, Math.abs(dx) - dx, Math.abs(dy) - dy, w, h);
@@ -296,6 +311,7 @@ export class IgrejaPainel3D {
       const m = o.material; if (!(o.isSprite || o.isPoints || (o.isMesh && m && !Array.isArray(m) && m.isShaderMaterial))) return;
       if (o.isSprite) o.getWorldPosition(c3); else { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); c3.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld); }
       this._free.push({ o, x: c3.x, z: c3.z, r: 0 });
+      if (o.isMesh || o.isPoints) this._clipShader(m);
     });
     // estado inicial: tudo desligado
     for (const it of ITEMS) H0._setItemState(it.key, { state: 'off', attrs: {} });
@@ -477,6 +493,17 @@ export class IgrejaPainel3D {
     let best = null, bd = 0.45;
     for (const [k, q] of this._itemPts) { const d = Math.hypot(p.x - q[0], p.y - q[1], p.z - q[2]); if (d < bd) { bd = d; best = k; } }
     return best;
+  }
+
+  // ShaderMaterial do cartão (poças de luz no piso, feixes, fluxo dos ares) passa a respeitar os planos de recorte da vista:
+  // sem isso a poça de uma entidade espalhada por vários cômodos (banheiros, circulação) vazava fora do corte
+  _clipShader(m) {
+    if (!m || !m.isShaderMaterial || m.userData.p3clip) return; m.userData.p3clip = true;
+    const vs = m.vertexShader, fs = m.fragmentShader, iv = vs.lastIndexOf('}'), mf = fs.indexOf('void main(){');
+    if (iv < 0 || mf < 0 || !/void main\(\)\{/.test(vs)) return;
+    m.vertexShader = '#include <clipping_planes_pars_vertex>\n' + vs.slice(0, iv) + ' { vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);\n#include <clipping_planes_vertex>\n }\n' + vs.slice(iv);
+    m.fragmentShader = '#include <clipping_planes_pars_fragment>\n' + fs.slice(0, mf + 12) + '\n#include <clipping_planes_fragment>\n' + fs.slice(mf + 12);
+    m.clipping = true; m.needsUpdate = true;
   }
 
   // estado → entidades do cartão (mesmo _setItemState) → luzes/materiais (sem animação: nível = alvo)

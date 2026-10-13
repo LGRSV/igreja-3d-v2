@@ -193,7 +193,7 @@ export class IgrejaPainel3D {
     this.version = VERSION; this._epoch = 0;
     // v1.1.0: a vista só redesenha quando algo que muda a imagem dela muda (_draw); de volta à aba, tudo de novo (canvas 2D pode ter sido descartado)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) this.invalidate(); });
-    if (typeof window !== 'undefined' && window.visualViewport) window.visualViewport.addEventListener('resize', () => { for (const v of this.views) if (v.drawn) this._pix(v, v.c.width, v.c.height); });   // pinça na página: sai do pixelated
+    if (typeof window !== 'undefined' && window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (!this._vvq) this._vvq = requestAnimationFrame(() => { this._vvq = 0; for (const v of this.views) if (v.drawn) this._pix(v, v.c.width, v.c.height); }); });   // pinça na página: sai do pixelated (1× por quadro)
   }
   ready() {
     if (!this._ready) this._ready = new Promise((res, rej) => setTimeout(() => {
@@ -372,6 +372,7 @@ export class IgrejaPainel3D {
     const iv = c.matrixWorldInverse.copy(c.matrixWorld).invert(), p = new THREE.Vector3(), lo = new THREE.Vector3(1e9, 1e9, 1e9), hi = new THREE.Vector3(-1e9, -1e9, -1e9);
     for (let i = 0; i < 8; i++) { p.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(iv); lo.min(p); hi.max(p); }
     c.left = lo.x; c.right = hi.x; c.bottom = lo.y; c.top = hi.y; c.near = Math.max(0.5, -hi.z); c.far = -lo.z; c.updateProjectionMatrix();
+    s.shadow.bias = -0.0006 * 124 / Math.max(1, c.far - c.near);   // mesmo bias em metros do recorte antigo (near 1, far 125): sem acne em GPU de celular
   }
   // as folhas das portas (InstancedMesh do cartão, animadas no modo Pessoa) viram malhas fixas do trecho de parede delas (cortam junto)
   _doorsToSegs(scene) {
@@ -644,7 +645,7 @@ export class IgrejaPainel3D {
   // js = JSON.stringify(st) já feito pelo _draw (assinatura); miniatura (_iso) tem chave própria
   _apply(st, js) {
     st = st || {};
-    const key = (this._iso ? 'P' : '') + (js || JSON.stringify(st)); if (key === this._key) return; this._key = key;
+    const key = (this._iso ? 'P' : '') + (this.host._topView ? 'T' : '') + (js || JSON.stringify(st)); if (key === this._key) return; this._key = key;   // vista de cima ↔ normal refaz o visual dos ares (selos, fluxo)
     const H0 = this.host, L = (st.lights || {}), bri = (b) => (b == null ? null : b > 100 ? b : Math.round(b * 2.55));
     for (const it of ITEMS) {
       let s = 'off', a = {};
@@ -775,14 +776,14 @@ export class IgrejaPainel3D {
   }
   // vista ao vivo na tela (miniatura não conta: não anima; aba escondida tem tamanho 0)
   _shown(v) { return !this._isPreview(v) && v.c.isConnected && !!v._wh && (v.c.parentElement || v.c).clientWidth > 0; }
-  // a vista mostra alguma unidade destes ares? (frustum da câmera com 3,2 m em volta da unidade: aparelho + jato; recorte do cômodo)
+  // a vista mostra alguma unidade destes ares? (frustum da câmera com 4 m em volta da unidade: aparelho + jato, que chega a ~3,8 m; recorte do cômodo)
   _airIn(v, keys) {
     if (!keys.length || !this._shown(v)) return false;
     const fr = this._fr || (this._fr = new THREE.Frustum()), m4 = this._m4 || (this._m4 = new THREE.Matrix4()), sp = this._sp || (this._sp = new THREE.Sphere()), cb = v._clipBox;
     fr.setFromProjectionMatrix(m4.multiplyMatrices(v.cam.projectionMatrix, v.cam.matrixWorldInverse));
     for (const key of keys) {
       const rt = this.host._items.get(key); if (!rt || !rt.airUnits) continue;
-      for (const u of rt.airUnits) { const p = u.p; if (cb && (p.x < cb[0] - 1 || p.x > cb[2] + 1 || p.z < cb[1] - 1 || p.z > cb[3] + 1)) continue; if (fr.intersectsSphere(sp.set(p, 3.2))) return true; }
+      for (const u of rt.airUnits) { const p = u.p; if (cb && (p.x < cb[0] - 1 || p.x > cb[2] + 1 || p.z < cb[1] - 1 || p.z > cb[3] + 1)) continue; if (fr.intersectsSphere(sp.set(p, 4))) return true; }
     }
     return false;
   }
@@ -812,7 +813,8 @@ export class IgrejaPainel3D {
         more = this._airAnim.size > 0 || swingOn;
         // v1.1.0: redesenha só as vistas ao vivo em que aparece um ar que andou neste passo (miniaturas ficam paradas); a vista em movimento
         // não ganha quadro extra (o próximo quadro do arrasto já mostra o ar: entre dois eventos do dedo só cabe um quadro)
-        for (const v of this.views) if (this._airIn(v, act)) { v._sig = null; if (!this._moving(v)) v.render(); }
+        // vista ao vivo escondida (aba fora): sem quadro agora, mas a assinatura cai para redesenhar quando voltar (senão fica o ar pela metade)
+        for (const v of this.views) if (act.length && !this._isPreview(v) && !this._shown(v)) v._sig = null; else if (this._airIn(v, act)) { v._sig = null; if (!this._moving(v)) v.render(); }
       }
       if (more) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
     };
@@ -905,7 +907,7 @@ export class IgrejaPainel3D {
     // já tem a imagem. O relógio dos ares zera a assinatura das vistas que ele redesenha. Desliga: shared({ liveSig: false }) ou window.__NOSKIP.
     const pv = this._isPreview(v), st = v.state ? v.state() : { lights: {}, night: true }, js = JSON.stringify(st || {}), cm = v.cam;
     const sig = [pw, ph, ...cm.matrixWorld.elements, ...cm.projectionMatrix.elements, ...v.rect, v.zoom, v._cutRoom, v.o.cuts, pv, this._epoch, sc].join() + js;
-    if (sig === v._sig && this.opts.liveSig !== false && !window.__NOSKIP) { v.skipped = (v.skipped || 0) + 1; v._in = 0; return; }
+    if (sig === v._sig && this.opts.liveSig !== false && !window.__NOSKIP) { v.skipped = (v.skipped || 0) + 1; v._in = 0; if (!this._airRaf && this._acPrev) this._swingCheck(); return; }   // de volta à aba: a aleta volta a oscilar
     if (v.c.width !== pw || v.c.height !== ph) { v.c.width = pw; v.c.height = ph; }
     const R = this.renderer, cv = R.domElement;
     if (cv.width < pw || cv.height < ph) R.setSize(Math.max(cv.width, pw), Math.max(cv.height, ph), false);
@@ -917,6 +919,10 @@ export class IgrejaPainel3D {
       // partículas do ar: tamanho em px de tela (uPS do _airStep) acompanha a escala, para não engordarem ao ampliar
       if (rh !== ph) for (const key of AC_KEYS) { const rt = this.host._items.get(key), u = rt && rt.airPts && rt.airPts.material.uniforms.uPS; if (u) { ps.push([u, u.value]); u.value *= rh / ph; } }
       sh = R.shadowMap.enabled && R.shadowMap.needsUpdate;
+      // o mapa de sombra é um só para todas as vistas: se esta vista esconde o mezanino (de cima, WCs), a passada da sombra sai antes,
+      // em 1×1 px, com ele de pé (senão as outras vistas herdavam a sombra sem o mezanino até a próxima passada)
+      const mz = this.host._mezz;
+      if (sh && mz && !mz.visible) { mz.visible = true; R.setViewport(0, 0, 1, 1); R.setScissor(0, 0, 1, 1); R.render(this.scene, v.cam); mz.visible = false; R.setViewport(0, 0, rw, rh); R.setScissor(0, 0, rw, rh); }
       R.render(this.scene, v.cam);
     } finally { R.clippingPlanes = []; for (const [u, x] of ps) u.value = x; if (sv) this._isoRestore(sv, sh); }
     v.g2.clearRect(0, 0, pw, ph);

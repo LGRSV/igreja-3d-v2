@@ -768,7 +768,7 @@ class IgrejaPainelCard extends HTMLElement {
       plateia: { on: !!on.plateia, bri: sid ? ({ culto: 60, ensaio: 25 }[sid] || 100) : S.plateiaBri || 100 },
       telao: { on: !!on.telao, title: sid ? '' : (S.telao && S.telao.title) || '' },
       som: !!on.som,
-      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null), fan: S.ac[k] ? S.ac[k].fan : null, swing: !sid && S.ac[k] ? S.ac[k].swing : null }])),   // miniatura não oscila: sem swing (não redesenha à toa)
+      ac: Object.fromEntries([...ACS, ...this._splits()].map((k) => [k, { on: sid && SPLITS.includes(k) ? !!on.ac_templo : !!on[k], mode: sid ? 'cool' : (S.ac[k] ? S.ac[k].hvac : null), fan: !sid && S.ac[k] ? S.ac[k].fan : null, swing: !sid && S.ac[k] ? S.ac[k].swing : null }])),   // miniatura não oscila nem segue a velocidade: sem swing/fan (não redesenha à toa)
       porta: sid ? sid === 'chegada' : !!S.porta,
       night: sid ? true : S.night !== false,
     };

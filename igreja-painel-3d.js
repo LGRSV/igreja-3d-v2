@@ -10848,7 +10848,7 @@ export class IgrejaPainel3D {
   _prep(v, st, js) {
     const H0 = this.host;
     H0._camera = v.cam; H0._topView = v.el >= 62;
-    if (H0._mezz) H0._mezz.visible = !H0._topView && !(v._cutRoom && ['wcs'].includes(v._cutRoom));
+    if (H0._mezz) H0._mezz.visible = this._mzOn(v);
     for (const f of this._free) if (f.hid) { f.o.visible = true; f.hid = false; }
     this._apply(st !== undefined ? st : v.state ? v.state() : { lights: {}, night: true }, js);
     const cb = v._clipBox;
@@ -10873,6 +10873,8 @@ export class IgrejaPainel3D {
   // não refazem sozinhas (integradores e sequência dos ares, porta). Antes a troca miniatura ↔ vista ao vivo reiniciava o ligar do ar
   // a cada desenho e o _airLoop redesenhava tudo sem parar.
   _isPreview(v) { return !!v.o.preview; }
+  // mezanino de pé nesta vista? (some na vista de cima, el ≥ 62, e no corte dos WCs que ficam embaixo dele)
+  _mzOn(v) { return !!this.host && !!this.host._mezz && !(v.el >= 62) && !(v._cutRoom && ['wcs'].includes(v._cutRoom)); }
   _isoSave() {
     const H0 = this.host, s = { ac: [], doors: [] };
     for (const key of AC_KEYS) {
@@ -10894,7 +10896,8 @@ export class IgrejaPainel3D {
   _kick() {
     if (this._raf) return;
     this._raf = requestAnimationFrame(() => {
-      this._raf = 0; const L = [...this._dirty], now = performance.now(), mv = [...this.views].some((x) => this._moving(x, now)); this._dirty.clear();
+      // vistas com o mezanino no mesmo estado da última passada de sombra primeiro: no máximo uma passada nova por lote
+      this._raf = 0; const L = [...this._dirty].sort((a, b) => (this._mzOn(b) === this._shMz) - (this._mzOn(a) === this._shMz)), now = performance.now(), mv = [...this.views].some((x) => this._moving(x, now)); this._dirty.clear();
       for (const x of L) { if (mv && !this._moving(x, now)) { this._dirty.add(x); continue; } try { this._draw(x); } catch (e) { console.warn('igreja-painel-3d: render', e); } }
       if (this._dirty.size) { clearTimeout(this._dt); this._dt = setTimeout(() => this._kick(), 320); }
     });
@@ -10941,11 +10944,11 @@ export class IgrejaPainel3D {
       R.setViewport(0, 0, rw, rh); R.setScissor(0, 0, rw, rh); R.setScissorTest(true);
       // partículas do ar: tamanho em px de tela (uPS do _airStep) acompanha a escala, para não engordarem ao ampliar
       if (rh !== ph) for (const key of AC_KEYS) { const rt = this.host._items.get(key), u = rt && rt.airPts && rt.airPts.material.uniforms.uPS; if (u) { ps.push([u, u.value]); u.value *= rh / ph; } }
-      sh = R.shadowMap.enabled && R.shadowMap.needsUpdate;
-      // o mapa de sombra é um só para todas as vistas: se esta vista esconde o mezanino (de cima, WCs), a passada da sombra sai antes,
-      // em 1×1 px, com ele de pé (senão as outras vistas herdavam a sombra sem o mezanino até a próxima passada)
-      const mz = this.host._mezz;
-      if (sh && mz && !mz.visible) { mz.visible = true; R.setViewport(0, 0, 1, 1); R.setScissor(0, 0, 1, 1); R.render(this.scene, v.cam); mz.visible = false; R.setViewport(0, 0, rw, rh); R.setScissor(0, 0, rw, rh); }
+      // o mapa de sombra é um só para todas as vistas: a sombra do sol segue o mezanino da vista (como no cartão: vista de cima sem ele);
+      // passada feita com o outro estado → passada nova (senão uma vista herdava a sombra da outra até a próxima passada)
+      const mzv = this._mzOn(v);
+      if (R.shadowMap.enabled && this._shMz !== mzv) R.shadowMap.needsUpdate = true;
+      sh = R.shadowMap.enabled && R.shadowMap.needsUpdate; if (sh) this._shMz = mzv;
       R.render(this.scene, v.cam);
     } finally { R.clippingPlanes = []; for (const [u, x] of ps) u.value = x; if (sv) this._isoRestore(sv, sh); }
     v.g2.clearRect(0, 0, pw, ph);

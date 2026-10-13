@@ -51,6 +51,23 @@ Opções: `layout`, `entities`, `title`, `height`, `vista_3d: false` (sem 3D, pl
 `quality` (como no igreja3d-card), `toque: false` (vistas só de olhar), `corte_comodo: false`, `alexa_device`
 (com `alexa_fala`, `alexa_anuncio`, `alexa_nao_incomodar` opcionais).
 
+### Novidades do painel v1.4.0 (motor 1.1.0)
+
+- **Nada redesenha à toa**: as miniaturas das cenas ficam paradas e cada vista 3D só é redesenhada quando algo nela muda (estado,
+  câmera, tamanho, corte ou a animação do A/C). Início parado: 0 redesenhos (antes as 7 vistas redesenhavam sem parar); um `hass`
+  de outra entidade: 0 redesenhos; acender uma luz redesenha só o cômodo e a planta.
+- **Menos draw calls**: as vistas sem corte desenham as paredes juntas, ~40–45 % menos draw calls (planta 843 → 466, templo
+  604 → 364); a sombra do sol ficou mais definida e o carregamento compila menos shaders (leve 90 → 74).
+- **Arrasto mais leve**: girar, aproximar com dois dedos ou rolar a roda desenha a vista com resolução menor (de 0,6 até 0,35, e só
+  desce se o quadro ficar mais rápido) e, ao soltar, sai um quadro nítido; as outras vistas esperam o dedo soltar. No SwiftShader o
+  quadro do arrasto caiu de 447 para 187 ms no layout de tablet (DPR 2) e de 264 para 153 ms em 1280×800.
+- **Imagem nítida no tablet**: com o painel escalado (Galaxy Tab S6 Lite, por exemplo) o navegador não borra mais o 3D: o canvas que
+  já tem os pixels da tela vai sem reamostrar (nitidez na tela de ~25 % para ~100 % da imagem desenhada).
+- **A/C no Início**: o ligar de um split (`ac_templo_N`) agora anima e termina; antes a troca com as miniaturas reiniciava a
+  animação e o split nem abria.
+- **Cômodos no leve**: à noite, em Ambientes, a poça de luz do piso do cômodo já iluminado ficou pela metade: o branco estourado sob
+  a luminária sumiu (Mídia 11012 → 3 pixels estourados, perto do `media`), brilho médio 3–8 % menor.
+
 ### Desenvolvimento
 
 - `python3 build_painel.py` gera o `igreja-painel-3d.js` a partir do `igreja3d-card.js` + `painel/motor.src.js`.

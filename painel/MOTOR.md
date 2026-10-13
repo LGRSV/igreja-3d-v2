@@ -28,7 +28,7 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 
 ## Redesenho (v1.1.0)
 - **Cada vista só redesenha quando algo que muda a imagem dela muda**: tamanho em px, câmera (giro, inclinação, zoom/distância,
-  alvo, área livre/deslocamento), retângulo enquadrado, corte (`cut`), `cuts`, `preview`, o `state()` e uma época global.
+  alvo, área livre/deslocamento), retângulo enquadrado, corte (`cut`), `cuts`, `preview`, o `state()`, a escala do arrasto e uma época global.
   `render()` sem mudança custa só essa comparação (contadores `v.drawn` e `v.skipped`); um `hass` que não mexe na igreja não desenha nada.
 - **A/C**: o relógio dos ares redesenha só as vistas ao vivo em que aparece uma unidade que anda (frustum da câmera com 3,2 m em
   volta da unidade, recorte do cômodo); quando o ar para, nada mais redesenha.
@@ -40,6 +40,28 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - `E.invalidate()` redesenha todas as vistas (para quem mexe na cena por fora do `state()`). Voltar à aba, canvas 2D descartado pelo
   navegador (`contextrestored`) e contexto WebGL restaurado redesenham sozinhos.
 - Desligar a comparação: `IgrejaPainel3D.shared({ liveSig: false })` (ou `window.__NOSKIP = true` nos testes).
+
+## Arrasto, nitidez e luz do leve (v1.1.0)
+- **Governador do arrasto**: girando, na pinça ou na roda, a vista grande (≥ 150 mil px² CSS: cômodo, Ambientes, Templo; a planta
+  pequena desenha normal) desenha com 0,6 da resolução e desce (×0,85, até 0,35) enquanto o quadro (média móvel) passa de 40 ms.
+  Cada descida tem que baixar o quadro ≥ 10 %; se não baixar (GPU limitada por vértices ou CPU), volta a escala anterior e para
+  de descer naquele arrasto: menor só borraria. O quadro conta da 1ª amostra do dedo (pausa do dedo não conta como quadro lento).
+  O canvas 2D fica do mesmo tamanho (a imagem menor é ampliada nele) e as partículas do ar mantêm o tamanho na tela.
+- Enquanto uma vista está em movimento as outras esperam na fila (estado novo, A/C, `hass`) e o relógio dos ares não dá quadro
+  extra à vista em movimento. Em movimento = até 0,3 s depois da última entrada e do quadro que ela pediu (`pointerup` perdido
+  não trava nada). Ao soltar (`pointerup`, `pointercancel`, `lostpointercapture`; roda: 150 ms depois do último evento e do último
+  quadro) ou com o dedo parado 0,3 s sai **um** quadro nítido (a escala entra na assinatura) e as vistas da fila desenham.
+  `v.scale` = escala do último quadro (1 parado). Toque (tap), `pickAt`, `project` e pinos usam px CSS: não mudam.
+- Medido (SwiftShader, leve, arrasto de 60 passos no cômodo do Início): quadro 447 → 187 ms no layout de tablet (1000×544, DPR 2,
+  escala 0,68) e 264 → 153 ms em 1280×800; nenhuma outra vista desenha durante o arrasto (antes a planta entrava no meio) e sai
+  exatamente um quadro na escala 1 ao soltar. Com custo fixo simulado (CPU) a escala volta a 0,6; com custo por pixel desce a 0,35.
+- **Nitidez no tablet**: o desenho de 1280×800 é escalado por `transform` e o compositor reamostrava o canvas com bilinear mesmo
+  quando ele já tinha os pixels da tela (~75 % da nitidez perdida). Quando o canvas bate 1:1 com os pixels da tela
+  (|largura em px − largura na tela × devicePixelRatio| ≤ 1,5, com a pinça da página) a vista usa `image-rendering: pixelated`; senão
+  fica suave (celular com `res` 0,8, DPR > 2, página ampliada). Tablet 1000×544 DPR 2: nitidez na tela 827 → 3373 (o canvas tem 3362).
+- **Luz dos cômodos no leve/min**: o cômodo que a luz que segue o alvo já ilumina fica com metade da poça do piso (luz real + poça
+  cheia estourava o branco sob a luminária nos cômodos cortados). Ambientes à noite, pixels estourados: Mídia 11012 → 3,
+  Voluntariado 12719 → 1157, Administrativo 19371 → 5333 (media: 213, 635, 4834); brilho médio −3 a −8 %.
 
 ## Menos draw calls e shaders (v1.1.0)
 - **Paredes inteiras**: além dos trechos (que cortam um a um), o motor junta todas as paredes numa cópia por material (o `matCanon` e o

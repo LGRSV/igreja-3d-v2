@@ -144,6 +144,13 @@ class P3View {
   render() { this.E._queue(this); }
   setZoom(z) { this.zoom = Math.max(0.6, Math.min(4, z)); if (this._sync()) this._place(...this._wh); this._moved(); }
   _moved() { this.render(); if (this._cam) this._cam(this); }
+  // v1.1.0: arrasto/pinça/roda em andamento (governador do _draw: desenha com resolução menor); _in = 1ª amostra de entrada desde o último
+  // quadro (o quadro é medido a partir dela: pausa do dedo não conta como quadro lento)
+  _go(e) {
+    const now = performance.now(), ce = e.getCoalescedEvents && e.getCoalescedEvents(), t = ce && ce.length ? ce[0].timeStamp : e.timeStamp;
+    if (!this._mv) this._gov = null; this._mv = now; if (!this._in) this._in = t > now - 1000 && t <= now ? t : now;
+  }
+  _rest() { if (this._mv) { this._mv = 0; this.render(); } }   // soltou: um quadro nítido (a escala entra na assinatura do _draw)
   _on(t, f, o) { this.c.addEventListener(t, f, o); this._h.push([t, f, o]); }
   _bind() {
     const c = this.c, P = new Map(); let drag = null, pinch = null;
@@ -155,10 +162,10 @@ class P3View {
     });
     this._on('pointermove', (e) => {
       if (!P.has(e.pointerId)) return; P.set(e.pointerId, loc(e));
-      if (pinch && P.size === 2) { const [a, b] = [...P.values()]; this.setZoom(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / Math.max(10, pinch.d)); return; }
+      if (pinch && P.size === 2) { this._go(e); const [a, b] = [...P.values()]; this.setZoom(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / Math.max(10, pinch.d)); return; }
       if (!drag) return; const p = loc(e), dx = p[0] - drag.p[0], dy = p[1] - drag.p[1];
       if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-      drag.moved = true; c.parentElement && c.parentElement.classList.add('p3drag');
+      drag.moved = true; this._go(e); c.parentElement && c.parentElement.classList.add('p3drag');
       this.az = drag.az - dx * 0.45; this.el = Math.max(18, Math.min(88, drag.el + dy * 0.3));
       if (this._sync()) this._place(...this._wh); this._moved();
     });
@@ -166,13 +173,17 @@ class P3View {
       if (!P.has(e.pointerId)) return; P.delete(e.pointerId);
       c.parentElement && c.parentElement.classList.remove('p3drag');
       if (drag && !drag.moved && this._click) { const p = loc(e); this._click(p[0], p[1], this.pickAt(p[0], p[1])); }
-      if (P.size < 2) pinch = null; drag = null;
+      if (P.size < 2) pinch = null; drag = null; this._rest();
     };
     this._on('pointerup', up); this._on('pointercancel', up);
-    this._on('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+    // v1.1.0: perdeu a captura sem pointerup (canvas trocado, outra captura): encerra o arrasto sem clique
+    this._on('lostpointercapture', (e) => { if (P.delete(e.pointerId) && !P.size) { drag = pinch = null; c.parentElement && c.parentElement.classList.remove('p3drag'); } this._rest(); });
+    // roda: solta 150 ms depois do último evento e do último quadro (quadro lento não encerra a rodada entre dois eventos)
+    const wq = () => { clearTimeout(this._wt); this._wt = setTimeout(() => { if (performance.now() - Math.max(this._mv, this._end || 0) < 150) wq(); else this._rest(); }, 150); };
+    this._on('wheel', (e) => { e.preventDefault(); this._go(e); wq(); this.setZoom(this.zoom * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
     this._on('dblclick', () => { this.frame(...this.rect, this.o.home ? this.o.home[0] : this.az, this.o.home ? this.o.home[1] : this.el); this._moved(); });
   }
-  dispose() { for (const [t, f, o] of this._h) this.c.removeEventListener(t, f, o); this._h = []; this._cam = this._click = null; this.E.drop(this); }
+  dispose() { clearTimeout(this._wt); clearTimeout(this._st); for (const [t, f, o] of this._h) this.c.removeEventListener(t, f, o); this._h = []; this._cam = this._click = null; this.E.drop(this); }
 }
 
 export class IgrejaPainel3D {
@@ -182,6 +193,7 @@ export class IgrejaPainel3D {
     this.version = VERSION; this._epoch = 0;
     // v1.1.0: a vista só redesenha quando algo que muda a imagem dela muda (_draw); de volta à aba, tudo de novo (canvas 2D pode ter sido descartado)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) this.invalidate(); });
+    if (typeof window !== 'undefined' && window.visualViewport) window.visualViewport.addEventListener('resize', () => { for (const v of this.views) if (v.drawn) this._pix(v, v.c.width, v.c.height); });   // pinça na página: sai do pixelated
   }
   ready() {
     if (!this._ready) this._ready = new Promise((res, rej) => setTimeout(() => {
@@ -798,8 +810,9 @@ export class IgrejaPainel3D {
           if (anim && !busy && now > (rt.airUntil || 0) && Math.abs((rt.p3sp || 1) - (rt.p3spc || 1)) < 0.01) this._airAnim.delete(key);
         }
         more = this._airAnim.size > 0 || swingOn;
-        // v1.1.0: redesenha só as vistas ao vivo em que aparece um ar que andou neste passo (miniaturas ficam paradas)
-        for (const v of this.views) if (this._airIn(v, act)) { v._sig = null; v.render(); }
+        // v1.1.0: redesenha só as vistas ao vivo em que aparece um ar que andou neste passo (miniaturas ficam paradas); a vista em movimento
+        // não ganha quadro extra (o próximo quadro do arrasto já mostra o ar: entre dois eventos do dedo só cabe um quadro)
+        for (const v of this.views) if (this._airIn(v, act)) { v._sig = null; if (!this._moving(v)) v.render(); }
       }
       if (more) this._airRaf = requestAnimationFrame(step); else { this._airRaf = 0; this._airLast = 0; }
     };
@@ -815,7 +828,13 @@ export class IgrejaPainel3D {
     this._apply(st !== undefined ? st : v.state ? v.state() : { lights: {}, night: true }, js);
     const cb = v._clipBox;
     if (cb) for (const f of this._free) if (f.o.visible && (f.x < cb[0] - f.r || f.x > cb[2] + f.r || f.z < cb[1] - f.r || f.z > cb[3] + f.r)) { f.o.visible = false; f.hid = true; }
-    if (H0._roomLight) { H0._orbit = { target: v.target }; H0._walkOn = false; H0._roomLightTick(this._dayScale || 1); }
+    if (H0._roomLight) {
+      H0._orbit = { target: v.target }; H0._walkOn = false; H0._roomLightTick(this._dayScale || 1);
+      // v1.1.0 leve/min: o cômodo que a luz que segue o alvo já ilumina fica com metade da poça do piso (luz real + poça cheia estourava
+      // o piso nos cômodos cortados); valor absoluto (fórmula do _apply) a cada vista: não acumula
+      const rk = H0._rlF && H0._roomLight.intensity > 0 ? H0._rlF.key : null, nk = THREE.MathUtils.lerp(0.12, 1, H0._nightLevel != null ? H0._nightLevel : 1);
+      for (const [k, rt] of H0._items) if (rt.pool) rt.pool.material.uniforms.uI.value = (rt.lv || 0) * H0._poolK * nk * (k === rk ? 0.5 : 1);
+    }
     if (H0._pool) { H0._assignPool(); for (const it of ITEMS) { const rt = H0._items.get(it.key); if (rt && rt.cands) for (const { L, i } of rt.lights) { L.intensity = i * (rt.lv || 0) * (this._dayScale || 1); L.color.copy(rt.color); } } }
     if (H0._needShadow) { this.renderer.shadowMap.needsUpdate = true; H0._needShadow = false; }
     this._applyCuts(v);
@@ -845,9 +864,33 @@ export class IgrejaPainel3D {
     let moved = false; for (const [g, ry] of s.doors) if (g.rotation.y !== ry) { g.rotation.y = ry; moved = true; }
     if (moved && sh) { this.host._refreshPointShadows('hall'); this.host._sun.shadow.needsUpdate = true; this.renderer.shadowMap.needsUpdate = true; }
   }
-  _queue(v) {
-    this._dirty.add(v);
-    if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; const L = [...this._dirty]; this._dirty.clear(); for (const x of L) { try { this._draw(x); } catch (e) { console.warn('igreja-painel-3d: render', e); } } });
+  _queue(v) { this._dirty.add(v); this._kick(); }
+  // v1.1.0: com uma vista em movimento (arrasto/pinça/roda), as outras ficam na fila até soltar (ou 0,3 s parado): nada disputa o quadro
+  _kick() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => {
+      this._raf = 0; const L = [...this._dirty], now = performance.now(), mv = [...this.views].some((x) => this._moving(x, now)); this._dirty.clear();
+      for (const x of L) { if (mv && !this._moving(x, now)) { this._dirty.add(x); continue; } try { this._draw(x); } catch (e) { console.warn('igreja-painel-3d: render', e); } }
+      if (this._dirty.size) { clearTimeout(this._dt); this._dt = setTimeout(() => this._kick(), 320); }
+    });
+  }
+  // em movimento: até 0,3 s depois da última entrada e do quadro que ela pediu (_mvEnd); _mv velho (sem pointerup) não trava nada
+  _moving(v, now = performance.now()) { return !!v._mv && now - Math.max(v._mv, v._mvEnd || 0) < 300; }
+  // Governador do arrasto (vista ≥ 150 mil px² CSS): começa em 0,6 da resolução e desce (×0,85, mín. 0,35) enquanto o quadro (EMA) passa de
+  // 40 ms; cada descida tem que baixar o quadro ≥ 10 %, senão volta e para de descer neste arrasto (GPU limitada por vértices/CPU: menor só borra)
+  _govFt(v, ft) {
+    const g = v._gov; if (!g || !(ft > 0) || ft > 600) return;
+    if (g.skip) { g.skip = false; return; }   // 1º quadro do arrasto ou da escala nova (pode carregar o quadro anterior)
+    g.n++; g.ema = g.n === 1 ? ft : g.ema * 0.6 + ft * 0.4; if (g.n < 3) return;
+    if (g.prev) { if (g.ema > g.prev.ema * 0.9) { g.s = g.prev.s; g.stop = true; g.n = 0; g.skip = true; } g.prev = null; return; }
+    if (!g.stop && g.ema > 40 && g.s > 0.35) { g.prev = { s: g.s, ema: g.ema }; g.s = Math.max(0.35, Math.round(g.s * 85) / 100); g.n = 0; g.skip = true; }
+  }
+  // v1.1.0: canvas 1:1 com os pixels da tela → image-rendering: pixelated (o desenho de 1280×800 é escalado por transform no tablet e o
+  // compositor reamostrava o canvas com bilinear: ~75 % da nitidez perdida); fora disso, suave
+  _pix(v, pw, ph) {
+    const r = v.c.getBoundingClientRect(), d = (window.devicePixelRatio || 1) * (window.visualViewport ? window.visualViewport.scale || 1 : 1);
+    const ir = Math.abs(pw - r.width * d) <= 1.5 && Math.abs(ph - r.height * d) <= 1.5 ? 'pixelated' : '';
+    if (v.c.style.imageRendering !== ir) v.c.style.imageRendering = ir;
   }
   _draw(v) {
     if (!this.scene || !v.c.isConnected) return;
@@ -855,25 +898,36 @@ export class IgrejaPainel3D {
     const [w, h] = v._wh, s = v._size().s || 1, dpr = Math.min(2, window.devicePixelRatio || 1);
     let k = s * dpr * (v.o.res || 1); const maxW = v.o.maxPx || 1800; if (w * k > maxW) k = maxW / w;
     const pw = Math.max(2, Math.round(w * k)), ph = Math.max(2, Math.round(h * k));
+    this._pix(v, pw, ph);
+    // v1.1.0: em movimento, vista grande desenha com a escala do governador (sc < 1) e amplia no canvas 2D (que fica do mesmo tamanho)
+    const t0 = performance.now(), mv = this._moving(v, t0), sc = mv && w * h >= 150000 ? (v._gov || (v._gov = { s: 0.6, n: 0, ema: 0, skip: true, prev: null, stop: false })).s : 1;
     // v1.1.0: assinatura do que muda a imagem desta vista (tamanho, câmera, enquadramento, corte, miniatura, estado, época); igual → o canvas 2D
     // já tem a imagem. O relógio dos ares zera a assinatura das vistas que ele redesenha. Desliga: shared({ liveSig: false }) ou window.__NOSKIP.
     const pv = this._isPreview(v), st = v.state ? v.state() : { lights: {}, night: true }, js = JSON.stringify(st || {}), cm = v.cam;
-    const sig = [pw, ph, ...cm.matrixWorld.elements, ...cm.projectionMatrix.elements, ...v.rect, v.zoom, v._cutRoom, v.o.cuts, pv, this._epoch].join() + js;
-    if (sig === v._sig && this.opts.liveSig !== false && !window.__NOSKIP) { v.skipped = (v.skipped || 0) + 1; return; }
+    const sig = [pw, ph, ...cm.matrixWorld.elements, ...cm.projectionMatrix.elements, ...v.rect, v.zoom, v._cutRoom, v.o.cuts, pv, this._epoch, sc].join() + js;
+    if (sig === v._sig && this.opts.liveSig !== false && !window.__NOSKIP) { v.skipped = (v.skipped || 0) + 1; v._in = 0; return; }
     if (v.c.width !== pw || v.c.height !== ph) { v.c.width = pw; v.c.height = ph; }
     const R = this.renderer, cv = R.domElement;
     if (cv.width < pw || cv.height < ph) R.setSize(Math.max(cv.width, pw), Math.max(cv.height, ph), false);
-    const sv = pv ? this._isoSave() : null; let sh = false;
+    const sv = pv ? this._isoSave() : null, rw = sc < 1 ? Math.max(2, Math.round(pw * sc)) : pw, rh = sc < 1 ? Math.max(2, Math.round(ph * sc)) : ph, ps = []; let sh = false;
     try {
       this._prep(v, st, js);
       R.clippingPlanes = v._clip || [];
-      R.setViewport(0, 0, pw, ph); R.setScissor(0, 0, pw, ph); R.setScissorTest(true);
+      R.setViewport(0, 0, rw, rh); R.setScissor(0, 0, rw, rh); R.setScissorTest(true);
+      // partículas do ar: tamanho em px de tela (uPS do _airStep) acompanha a escala, para não engordarem ao ampliar
+      if (rh !== ph) for (const key of AC_KEYS) { const rt = this.host._items.get(key), u = rt && rt.airPts && rt.airPts.material.uniforms.uPS; if (u) { ps.push([u, u.value]); u.value *= rh / ph; } }
       sh = R.shadowMap.enabled && R.shadowMap.needsUpdate;
       R.render(this.scene, v.cam);
-    } finally { R.clippingPlanes = []; if (sv) this._isoRestore(sv, sh); }
+    } finally { R.clippingPlanes = []; for (const [u, x] of ps) u.value = x; if (sv) this._isoRestore(sv, sh); }
     v.g2.clearRect(0, 0, pw, ph);
-    v.g2.drawImage(cv, 0, cv.height - ph, pw, ph, 0, 0, pw, ph);
-    v.drawn = (v.drawn || 0) + 1; v._sig = sig;
+    v.g2.drawImage(cv, 0, cv.height - rh, rw, rh, 0, 0, pw, ph);
+    v.drawn = (v.drawn || 0) + 1; v._sig = sig; v.scale = sc;
+    const t1 = performance.now(); if (mv && v._in) v._mvEnd = t1;
+    if (sc < 1) {   // governador: quadro medido da 1ª entrada (ou do quadro anterior) até aqui; parado 0,3 s sem soltar → quadro nítido
+      if (v._in) this._govFt(v, t1 - Math.max(v._end || 0, v._in)); v._end = t1;
+      clearTimeout(v._st); v._st = setTimeout(() => { if (v._mv) v.render(); }, 320);
+    }
+    v._in = 0;
     if (!this._airRaf && this._acPrev) this._swingCheck();
   }
 }

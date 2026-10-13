@@ -10213,7 +10213,7 @@ export class IgrejaPainel3D {
     }, 20));
     return this._ready;
   }
-  view(canvas, o) { const v = new P3View(this, canvas, o); this.views.add(v); if (this.scene) v.render(); return v; }
+  view(canvas, o) { const v = new P3View(this, canvas, o); this.views.add(v); if (o && o.cuts === true) this._warmCut(); if (this.scene) v.render(); return v; }
   // redesenha todas as vistas na próxima vez (ignora as assinaturas); para quem mexe na cena por fora
   invalidate() { this._epoch++; for (const v of this.views) { v._sig = null; v.render(); } }
   drop(v) { this.views.delete(v); this._dirty.delete(v); }
@@ -10359,9 +10359,30 @@ export class IgrejaPainel3D {
     // estado inicial: tudo desligado
     for (const it of ITEMS) H0._setItemState(it.key, { state: 'off', attrs: {} });
     H0._activitySeeded = true;
+    // v1.1.0 media: reflexo da noite já nos brilhantes (e nas cópias de corte deles) antes do aquecimento: o 1º desenho não compila mais nada
+    if (H0._envMats && H0._envNight) for (const m of H0._envMats) { m.envMap = H0._envNight; const c = this._cutMats && this._cutMats.get(m); if (c) c.envMap = H0._envNight; }
+    this._shBox = this._casters();
     this._key = null; this._cutSig = null; this._nlApplied = null;
     renderer.shadowMap.needsUpdate = true;
     console.info(`[igreja-painel-3d] v${VERSION} · qualidade ${q} · ${stats.after} malhas estáticas · ${segs.length} trechos de parede · ${H0._nLights} luzes`);
+  }
+  // v1.1.0: caixa de quem projeta sombra (o que aparece, porta fechada e aberta) + 0,5 m, com a laje (recebe): a câmera de sombra do sol/lua
+  // fica justa nela (_fitSun) em vez de 76 × 76 m e 1–125 m de profundidade
+  _casters() {
+    const b = new THREE.Box3(), t = new THREE.Box3(), pr = this.host._items.get('porta'), lv = (pr && pr.leaves) || [];
+    const bx = (o) => { const g = o.isInstancedMesh ? o : o.geometry; if (!g.boundingBox) g.computeBoundingBox(); return g.boundingBox; };
+    const add = () => { this.scene.updateMatrixWorld(true); this.scene.traverseVisible((o) => { if (o.isMesh && o.castShadow) b.union(t.copy(bx(o)).applyMatrix4(o.matrixWorld)); }); };
+    const r0 = lv.map((lf) => lf.g.rotation.y);
+    add(); lv.forEach((lf) => { lf.g.rotation.y = lf.base - lf.dir * 1.25; }); if (lv.length) add(); lv.forEach((lf, i) => { lf.g.rotation.y = r0[i]; });
+    this.scene.updateMatrixWorld(true);
+    return b.isEmpty() ? null : b.expandByScalar(0.5).union(t.setFromObject(this.slab));
+  }
+  _fitSun() {
+    const s = this.host._sun, c = s.shadow.camera, b = this._shBox; if (!b) return;
+    c.position.copy(s.position); c.lookAt(s.target.position); c.updateMatrixWorld(true);   // como o DirectionalLightShadow.updateMatrices
+    const iv = c.matrixWorldInverse.copy(c.matrixWorld).invert(), p = new THREE.Vector3(), lo = new THREE.Vector3(1e9, 1e9, 1e9), hi = new THREE.Vector3(-1e9, -1e9, -1e9);
+    for (let i = 0; i < 8; i++) { p.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(iv); lo.min(p); hi.max(p); }
+    c.left = lo.x; c.right = hi.x; c.bottom = lo.y; c.top = hi.y; c.near = Math.max(0.5, -hi.z); c.far = -lo.z; c.updateProjectionMatrix();
   }
   // as folhas das portas (InstancedMesh do cartão, animadas no modo Pessoa) viram malhas fixas do trecho de parede delas (cortam junto)
   _doorsToSegs(scene) {
@@ -10445,6 +10466,35 @@ export class IgrejaPainel3D {
       }
       s.caps = caps;
     }
+    // v1.1.0: cópia única das paredes, por material (matCanon + mergeGeos do cartão), para as vistas sem trecho cortado: ~400 draw calls
+    // a menos na planta. Fora dela: vidro e transparentes (a ordem de desenho segue por trecho), peça escondida e material de aparelho
+    // (o estado mexe nele: não troca pelo canônico)
+    this._wallAll = []; this._wallIn = []; this._wallMode = null;
+    if (this.opts.wallAll === false) return;
+    const rtm = new Set(), seen = new Set(), scan = (x, d) => {
+      if (!x || typeof x !== 'object' || seen.has(x) || d > 3) return; seen.add(x);
+      if (x.isMaterial) rtm.add(x); else if (x.isObject3D) [].concat(x.material || []).forEach((m) => rtm.add(m)); else if (!x.isTexture && !x.isBufferGeometry && !ArrayBuffer.isView(x)) for (const k in x) scan(x[k], d + 1);
+    };
+    for (const rt of this.host._items.values()) scan(rt, 0);
+    const G = new Map(), reps = [], inv = new THREE.Matrix4();
+    for (const s of this.segs) for (const m of s.meshes) {
+      m.userData.vis0 = m.visible;
+      if (!m.isMesh || m.isInstancedMesh || Array.isArray(m.material) || m.material.transparent || !m.visible || m.children.length || !m.geometry.attributes.uv || !m.geometry.attributes.normal) continue;
+      const mat = rtm.has(m.material) ? m.material : matCanon(reps, m.material), key = mat.uuid + (m.castShadow ? 'c' : 'n') + (m.receiveShadow ? 'r' : '') + m.renderOrder;
+      if (!G.has(key)) G.set(key, { mat, list: [] }); G.get(key).list.push(m);
+    }
+    scene.updateMatrixWorld(true);
+    for (const { mat, list } of G.values()) {
+      const m = new THREE.Mesh(mergeGeos(list, inv), mat); m.castShadow = list[0].castShadow; m.receiveShadow = list[0].receiveShadow; m.renderOrder = list[0].renderOrder;
+      m.matrixAutoUpdate = false; m.visible = false; Object.assign(m.userData, { noMerge: true, arch: true, wallAll: true });
+      scene.add(m); this._wallAll.push(m); this._wallIn.push(...list);
+    }
+  }
+  // paredes inteiras (nenhum trecho cortado na vista) ou trechos; peça que estava escondida continua escondida
+  _wallsFor(cut) {
+    if (this._wallMode === cut) return; this._wallMode = cut;
+    for (const m of this._wallIn) m.visible = cut && m.userData.vis0;
+    for (const m of this._wallAll) m.visible = !cut;
   }
   _precompile() {
     const r = this.renderer, cam = new THREE.PerspectiveCamera(50, 1.6, 0.1, 600); cam.position.set(60, 60, 30); cam.lookAt(10, 0, 30); cam.updateMatrixWorld();
@@ -10452,26 +10502,30 @@ export class IgrejaPainel3D {
     let p;
     try { p = r.extensions.has('KHR_parallel_shader_compile') ? r.compileAsync(this.scene, cam) : (r.compile(this.scene, cam), Promise.resolve()); } catch (e) { p = Promise.resolve(); }
     for (const s of this.segs) for (const c of s.caps) c.visible = false;
-    return p.catch(() => {}).then(() => this._warm(cam));
+    this._wcam = cam;
+    return p.catch(() => {}).then(() => { this._warm([[false, false], [false, true], [true, true]]); this._warmed = true; if (this._wantCut) this._warmCut(); });
   }
-  // Aquece os programas de todas as combinações que as vistas usam (paredes cortadas × recorte do cômodo), desenhando 1×1 px:
-  // sem isso o primeiro corte/cômodo de cada vista compilava dezenas de shaders na hora (picos de 0,2–0,6 s)
-  _warm(cam) {
-    const r = this.renderer, big = 1e4, keep = [new THREE.Plane(new THREE.Vector3(1, 0, 0), big), new THREE.Plane(new THREE.Vector3(-1, 0, 0), big),
+  // Aquece os programas das combinações que as vistas usam (paredes cortadas × recorte do cômodo), desenhando 1×1 px: sem isso o primeiro
+  // corte/cômodo de cada vista compilava dezenas de shaders na hora (picos de 0,2–0,6 s). v1.1.0: parede cortada sem recorte só existe com
+  // { cuts: true } (nenhuma vista do painel usa): fica de fora (16 programas e ~20 % do ready a menos) e é aquecida depois, uma vez, quando
+  // uma vista dessas aparece (later: sem gastar a sombra pendente)
+  _warm(combos, later) {
+    const r = this.renderer, cam = this._wcam, big = 1e4, keep = [new THREE.Plane(new THREE.Vector3(1, 0, 0), big), new THREE.Plane(new THREE.Vector3(-1, 0, 0), big),
       new THREE.Plane(new THREE.Vector3(0, 0, 1), big), new THREE.Plane(new THREE.Vector3(0, 0, -1), big)];
     const hidden = []; this.scene.traverse((o) => { if (!o.visible && (o.isMesh || o.isSprite || o.isPoints)) { o.visible = true; hidden.push(o); } });
-    const t0 = performance.now();
+    const t0 = performance.now(), nu = r.shadowMap.needsUpdate;
     try {
-      r.setScissorTest(true);
-      for (const cut of [false, true]) for (const clip of [false, true]) {
+      r.setScissorTest(true); if (later) r.shadowMap.needsUpdate = false;
+      for (const [cut, clip] of combos) {
         for (const s of this.segs) this._setCut(s, cut);
         r.clippingPlanes = clip ? keep : [];
         r.setViewport(0, 0, 1, 1); r.setScissor(0, 0, 1, 1); r.render(this.scene, cam);
       }
     } catch (e) { console.warn('igreja-painel-3d: aquecimento', e); }
     r.clippingPlanes = []; for (const s of this.segs) this._setCut(s, false); for (const o of hidden) o.visible = false;
-    r.shadowMap.needsUpdate = true; this._key = null; this._warmMs = Math.round(performance.now() - t0);
+    r.shadowMap.needsUpdate = later ? nu : true; this._key = null; this._warmMs = (this._warmMs || 0) + Math.round(performance.now() - t0);
   }
+  _warmCut() { this._wantCut = true; if (this._warmed && !this._cutWarm) { this._cutWarm = true; setTimeout(() => this._warm([[true, false]], true), 0); } }
 
 
   // Corta (por vista) os trechos de parede entre a câmera e o retângulo em foco: raio câmera → ponto do foco (altura ty) atravessa o trecho
@@ -10508,6 +10562,7 @@ export class IgrejaPainel3D {
       this._setCut(W, hit); sig += hit ? '1' : '0';
     }
     this._cutSig = sig;
+    this._wallsFor(sig.includes('1') || !!window.__NOWALL);
   }
   _setCut(W, on) {
     if (W.cut === on) return; W.cut = on;
@@ -10546,7 +10601,7 @@ export class IgrejaPainel3D {
       const n = it.face && !o.userData.ground ? it.face.normal.clone().transformDirection(o.matrixWorld) : null;
       const gx = n && Math.abs(n.y) < 0.5 ? p.x + n.x * 0.15 : p.x, gz = n && Math.abs(n.y) < 0.5 ? p.z + n.z * 0.15 : p.z;
       let room = p3RoomAt(gx, gz);
-      if (o.userData.seg != null) {   // v1.0.1: tocou numa parede em pé → vale o cômodo do chão sob o dedo (o que a pessoa está apontando)
+      if (o.userData.seg != null || o.userData.wallAll) {   // v1.0.1: tocou numa parede em pé → vale o cômodo do chão sob o dedo (o que a pessoa está apontando)
         const g = v.pick(px, py), r2 = g && p3RoomAt(g[0], g[1]); if (r2) room = r2;
       }
       if (v._cutRoom && ROOMS3D[v._cutRoom] && room !== v._cutRoom) room = v._cutRoom;   // corte no cômodo: o que sobra é dele
@@ -10621,7 +10676,7 @@ export class IgrejaPainel3D {
     H0._amb.intensity = Lr(0.12, Lr(0.14, 0.36, nv), nl); H0._amb.color.setHex(0xdde4ee).lerp(Cc(0x6b7aa8), nl);
     const C = H0._sun.target.position, sunPos = C.clone().addScaledVector(H0._sunPos, H0._sunDist);
     H0._sun.intensity = Lr(3.2, Lr(0.5, 1.15, nv), nl); H0._sun.position.lerpVectors(sunPos, H0._moonPos, nl); H0._sun.color.setHex(0xfff0d2).lerp(Cc(0x8fa6d8), nl);
-    if (this._nlApplied !== nl) { this._nlApplied = nl; H0._sun.shadow.needsUpdate = true; this.renderer.shadowMap.needsUpdate = true; }
+    if (this._nlApplied !== nl) { this._nlApplied = nl; this._fitSun(); H0._sun.shadow.needsUpdate = true; this.renderer.shadowMap.needsUpdate = true; }
     const envI = Lr(0.9, Lr(0.35, 0.7, nv), nl);
     if (H0._probe) { H0._probe.sh.copy(H0._shDay).lerp(H0._shNight, nl); H0._probe.intensity = envI; }
     if (H0._envDay) {

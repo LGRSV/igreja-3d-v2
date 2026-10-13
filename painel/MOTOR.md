@@ -22,7 +22,9 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - `points(chave)` → posições `[x, y, z]` das luminárias/aparelhos (pinos).
 - `estado` = `{ lights:{chave:bool}, palco:{on, rgb:[r,g,b], bri 0–100}, plateia:{on, bri}, telao:{on, title}, som:bool,
   ac:{chave:{on, mode:'cool'|'heat'|…}}, porta:bool, night:bool }`.
-- Paredes entre a câmera e o retângulo enquadrado são cortadas a 0,9 m (com a decoração fina presa nelas); `view(…, { cuts: false })` desliga.
+- Paredes e fachada ficam de pé por padrão (v1.0.1). Na vista recortada num cômodo (`cut`), as paredes dele entre a câmera e o retângulo
+  enquadrado são cortadas a 0,9 m (com a decoração fina presa nelas); `view(…, { cuts: false })` desliga e `{ cuts: true }` corta
+  também sem recorte (nenhuma vista do painel usa: os programas desse caso são aquecidos depois, na 1ª vista criada com ele).
 
 ## Redesenho (v1.1.0)
 - **Cada vista só redesenha quando algo que muda a imagem dela muda**: tamanho em px, câmera (giro, inclinação, zoom/distância,
@@ -38,6 +40,21 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - `E.invalidate()` redesenha todas as vistas (para quem mexe na cena por fora do `state()`). Voltar à aba, canvas 2D descartado pelo
   navegador (`contextrestored`) e contexto WebGL restaurado redesenham sozinhos.
 - Desligar a comparação: `IgrejaPainel3D.shared({ liveSig: false })` (ou `window.__NOSKIP = true` nos testes).
+
+## Menos draw calls e shaders (v1.1.0)
+- **Paredes inteiras**: além dos trechos (que cortam um a um), o motor junta todas as paredes numa cópia por material (o `matCanon` e o
+  `mergeGeos` do cartão, como o `mergeStatic`). Vista sem nenhum trecho cortado (planta, bloco, Templo, miniaturas) desenha a cópia;
+  com corte, os trechos. Planta ~853 → ~467 draw calls, templo ~556 → ~332, mini ~572 → ~337, Início inteiro (7 vistas) ~4790 →
+  ~2760; passada de sombra do sol 335 → 156.
+  Sombra, `pickAt` e vistas com corte iguais. Vidro e transparentes seguem por trecho (ordem de desenho) e materiais de aparelho não
+  trocam pelo canônico. `shared({ wallAll: false })` (ou `window.__NOWALL = true` nos testes) fica só com os trechos.
+- **Sombra do sol/lua justa**: a câmera de sombra cobre só a caixa de quem projeta sombra (+0,5 m, com a laje), refeita na troca
+  dia/noite: ~59 × 59 m de dia (~65 × 54 m com a lua) e ~34–79 m de profundidade em vez de 76 × 76 m e 1–125 m (mesmo mapa;
+  texel ~7,4 → ~5,7 cm). Bias igual (sem acne nem sombra solta nos closes de dia e de noite).
+- **Aquecimento** (`ready()`): as combinações sem corte e com recorte do cômodo (com e sem parede cortada); parede cortada sem recorte
+  (`cuts: true`) só depois, uma vez. No `media` o reflexo da noite já vai para os materiais brilhantes (e as cópias de corte deles)
+  antes. leve 90 → 74 programas, nenhum compilado depois (planta, cômodos, Ambientes, dia); media 100 + 22 no uso → 88 + 2
+  (a sombra das luzes pontuais, no 1º desenho).
 
 ## Teste
 `THREE_LOCAL=…/three.module.min.js <python com playwright> painel/teste/test_motor.py <pasta-dos-pngs>` (Chrome instalado, sem Node).

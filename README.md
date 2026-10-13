@@ -45,7 +45,7 @@ Demo com Home Assistant simulado: `painel.html` (abrir por HTTP, por exemplo `py
        # alexa_device: <id do Echo>   # mostra o menu Alexa
    ```
 
-**Mais leve** (v1.3.1, motor v1.1.0): as miniaturas das cenas ficam paradas e cada vista 3D só é redesenhada quando algo nela muda (estado, câmera, tamanho, corte ou a animação do A/C); com nada mudando o 3D não gasta GPU, e um `hass` de outra entidade não redesenha nada. Antes o Início redesenhava as 7 vistas sem parar.
+**Mais leve** (v1.3.1, motor v1.1.0): as miniaturas das cenas ficam paradas e cada vista 3D só é redesenhada quando algo nela muda (estado, câmera, tamanho, corte ou a animação do A/C); com nada mudando o 3D não gasta GPU, e um `hass` de outra entidade não redesenha nada. Antes o Início redesenhava as 7 vistas sem parar. As vistas sem corte desenham as paredes juntas (quase metade das draw calls), a sombra do sol ficou mais definida e o carregamento compila menos shaders.
 
 **Celular** (v1.3.0): em tela estreita (< 700 px) ou baixa (< 520 px) o painel vira uma coluna com rolagem, abas embaixo, seletores e janelas que sobem de baixo, e o 3D com resolução menor; dá para rolar a página por cima do 3D (arrastar na horizontal gira). `layout: celular | painel` força um dos dois.
 

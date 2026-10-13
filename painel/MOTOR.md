@@ -30,8 +30,14 @@ v.onCam((v) => …);                                    // girou/aproximou (para
 - **Cada vista só redesenha quando algo que muda a imagem dela muda**: tamanho em px, câmera (giro, inclinação, zoom/distância,
   alvo, área livre/deslocamento), retângulo enquadrado, corte (`cut`), `cuts`, `preview`, o `state()`, a escala do arrasto e uma época global.
   `render()` sem mudança custa só essa comparação (contadores `v.drawn` e `v.skipped`); um `hass` que não mexe na igreja não desenha nada.
-- **A/C**: o relógio dos ares redesenha só as vistas ao vivo em que aparece uma unidade que anda (frustum da câmera com 3,2 m em
-  volta da unidade, recorte do cômodo); quando o ar para, nada mais redesenha.
+- **A/C**: o relógio dos ares redesenha só as vistas ao vivo em que aparece uma unidade que anda (frustum da câmera com 4 m em
+  volta da unidade — o jato do templo chega a ~3,8 m —, recorte do cômodo); quando o ar para, nada mais redesenha. Vista ao vivo
+  escondida (aba do cartão fora) não desenha, mas perde a assinatura: ao voltar mostra o ar como está (não o quadro do meio do ligar).
+  Um desenho pulado também religa o relógio da aleta (oscilação volta depois de trocar de aba). Vista de cima ↔ normal reaplica o
+  visual dos ares (selos de modo e fluxo de cima não passam para as outras vistas).
+- **Sombra e mezanino**: o mapa de sombra é um só. A passada segue o mezanino da vista desenhada (como no cartão: vista de cima,
+  el ≥ 62, e corte dos WCs sem ele); se a última passada foi feita com o mezanino no outro estado, sai uma passada nova. O lote
+  desenha primeiro as vistas no mesmo estado da última passada (no máximo uma passada nova por lote).
 - **`preview: true`** (opcional, padrão `false`; uma vista não interativa sem ele continua animando, como a mini do `motor.html`):
   miniatura de uma cena. Desenha o estado dela com cada unidade de A/C direto no estado final (sem o ligar animado nem a aleta
   oscilando) e depois devolve à cena o estado ao vivo (integradores e sequência dos ares, porta), sem refazer as sombras da
@@ -72,7 +78,8 @@ v.onCam((v) => …);                                    // girou/aproximou (para
   trocam pelo canônico. `shared({ wallAll: false })` (ou `window.__NOWALL = true` nos testes) fica só com os trechos.
 - **Sombra do sol/lua justa**: a câmera de sombra cobre só a caixa de quem projeta sombra (+0,5 m, com a laje), refeita na troca
   dia/noite: ~59 × 59 m de dia (~65 × 54 m com a lua) e ~34–79 m de profundidade em vez de 76 × 76 m e 1–125 m (mesmo mapa;
-  texel ~7,4 → ~5,7 cm). Bias igual (sem acne nem sombra solta nos closes de dia e de noite).
+  texel ~7,4 → ~5,7 cm). O bias é reescalado para a profundidade nova (`-0,0006 × 124 / (far − near)`): o mesmo valor em metros
+  de antes, para não aparecer acne em GPU de celular (sem acne nem sombra solta nos closes de dia e de noite).
 - **Aquecimento** (`ready()`): as combinações sem corte e com recorte do cômodo (com e sem parede cortada); parede cortada sem recorte
   (`cuts: true`) só depois, uma vez. No `media` o reflexo da noite já vai para os materiais brilhantes (e as cópias de corte deles)
   antes. leve 90 → 74 programas, nenhum compilado depois (planta, cômodos, Ambientes, dia); media 100 + 22 no uso → 88 + 2
